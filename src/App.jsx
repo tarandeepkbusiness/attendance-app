@@ -14,7 +14,9 @@ import Success from './pages/volunteer/Success';
 import Duplicate from './pages/volunteer/Duplicate';
 import OfflineQueue from './pages/volunteer/OfflineQueue';
 import Me from './pages/volunteer/Me';
+import AdminLayout from './components/AdminLayout';
 import AdminDashboard from './pages/admin/AdminDashboard';
+import AdminMe from './pages/admin/AdminMe';
 import CreateEvent from './pages/admin/CreateEvent';
 import Settings from './pages/Settings';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
@@ -22,8 +24,24 @@ import PWAInstallPrompt from './components/PWAInstallPrompt';
 export const AuthContext = React.createContext(null);
 
 function App() {
-  const [user, setUser] = useState(null); 
+  const [user, setUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem('attendance_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      console.error('Failed to parse saved session', e);
+      return null;
+    }
+  }); 
   const [language, setLanguage] = useState('en'); 
+
+  useEffect(() => {
+    if (user) {
+      localStorage.setItem('attendance_user', JSON.stringify(user));
+    } else {
+      localStorage.removeItem('attendance_user');
+    }
+  }, [user]);
 
   return (
     <AuthContext.Provider value={{ user, setUser, language, setLanguage }}>
@@ -49,7 +67,10 @@ function App() {
           </Route>
 
           {/* Admin Routes */}
-          <Route path="/admin" element={user?.role === 'admin' ? <AdminDashboard /> : <Navigate to="/login" />} />
+          <Route path="/admin" element={user?.role === 'admin' ? <AdminLayout /> : <Navigate to="/login" />}>
+            <Route index element={<AdminDashboard />} />
+            <Route path="me" element={<AdminMe />} />
+          </Route>
           <Route path="/admin/create-event" element={user?.role === 'admin' ? <CreateEvent /> : <Navigate to="/login" />} />
           
           {/* Shared */}

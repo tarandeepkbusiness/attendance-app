@@ -5,9 +5,24 @@ function Splash() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Navigate to login after 2 seconds
+    // Navigate to respective homes if logged in, otherwise go to login after 2 seconds
     const timer = setTimeout(() => {
-      navigate('/login');
+      const saved = localStorage.getItem('attendance_user');
+      if (saved) {
+        try {
+          const userObj = JSON.parse(saved);
+          if (userObj?.role === 'admin') {
+            navigate('/admin', { replace: true });
+            return;
+          } else if (userObj?.role === 'volunteer') {
+            navigate('/volunteer/home', { replace: true });
+            return;
+          }
+        } catch (e) {
+          console.error('Failed to parse persistent session', e);
+        }
+      }
+      navigate('/login', { replace: true });
     }, 2000);
 
     return () => clearTimeout(timer);

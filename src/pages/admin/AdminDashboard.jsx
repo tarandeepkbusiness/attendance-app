@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CalendarPlus, Users, FileSpreadsheet, Download, Settings as SettingsIcon, LogOut } from 'lucide-react';
+import { CalendarPlus, Users, FileSpreadsheet, Download, Settings as SettingsIcon } from 'lucide-react';
 
 function AdminDashboard() {
   const navigate = useNavigate();
@@ -14,21 +14,17 @@ function AdminDashboard() {
   ];
 
   return (
-    <div className="app-container animate-fade-in">
+    <div className="app-container animate-fade-in" style={{ padding: '1.5rem', paddingBottom: '80px' }}>
       <div className="header">
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <img onError={(e) => { e.target.onerror = null; e.target.src='/favicon.svg'; }} src="/logo.png" alt="App Logo" style={{ height: '32px', width: 'auto' }} />
           <div>
-            <h1 style={{ color: 'var(--secondary-color)' }}>Admin Singh</h1>
-            <p style={{ margin: 0, fontSize: '0.85rem', color: 'rgba(128, 90, 64, 0.7)' }}>Master Control</p>
+            <h1 style={{ color: 'var(--secondary-color)', margin: 0 }}>Admin Panel</h1>
           </div>
         </div>
-        <button onClick={() => navigate('/settings')} style={{ color: 'var(--text-color)' }}>
-          <LogOut size={20} />
-        </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '1rem' }}>
         {adminCards.map((card, idx) => (
           <div 
             key={idx} 
