@@ -17,6 +17,7 @@ import Me from './pages/volunteer/Me';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import CreateEvent from './pages/admin/CreateEvent';
 import Settings from './pages/Settings';
+import PWAInstallPrompt from './components/PWAInstallPrompt';
 
 export const AuthContext = React.createContext(null);
 
@@ -54,6 +55,7 @@ function App() {
           {/* Shared */}
           <Route path="/settings" element={user ? <Settings /> : <Navigate to="/login" />} />
         </Routes>
+        <PWAInstallPrompt />
       </BrowserRouter>
     </AuthContext.Provider>
   );
