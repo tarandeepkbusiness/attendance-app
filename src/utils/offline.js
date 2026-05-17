@@ -36,23 +36,35 @@ export const syncOfflineQueue = async () => {
   
   if (pending.length === 0) return { success: true, count: 0 };
 
+  const API_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxCNRPi8VzffFG49HMXeQYKgkJPG2BzBPbqm9mvjFG-WdCXeLrDWjgQUnXKoTRp650O/exec';
+
   let syncedCount = 0;
   for (const record of pending) {
     try {
-      // Mock API call to Google App Script or your backend
-      // Replace with actual fetch call
-      /*
-      await fetch('YOUR_API_ENDPOINT', {
+      // Real API POST call to Google Apps Script
+      const response = await fetch(API_ENDPOINT, {
         method: 'POST',
-        body: JSON.stringify(record)
+        mode: 'cors',
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8' // Simple content type avoids CORS preflight OPTIONS block
+        },
+        body: JSON.stringify({
+          studentName: record.student?.name || "Scan Result",
+          rollNumber: record.student?.rollNo || record.qrData || "Unknown",
+          city: record.city,
+          event: record.event,
+          volunteerId: record.student?.volunteerId || "V001",
+          timestamp: record.timestamp
+        })
       });
-      */
       
-      // Simulate network request
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      updateRecordStatus(record.id, 'synced');
-      syncedCount++;
+      // Google Apps Script responses may return redirect, check response ok or opaque type
+      if (response.ok || response.type === 'opaque') {
+        updateRecordStatus(record.id, 'synced');
+        syncedCount++;
+      } else {
+        console.error('Server rejected sync:', response.status);
+      }
     } catch (e) {
       console.error('Failed to sync record:', record.id, e);
     }
