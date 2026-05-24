@@ -1,16 +1,20 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Search, User } from 'lucide-react';
+import { mockStudents } from '../../utils/studentData';
 
 function SearchStudent() {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
   
-  // Mock results
-  const results = [
-    { id: '1', name: 'Aman Singh', rollNo: 'CS-101', city: 'City A' },
-    { id: '2', name: 'Priya Kaur', rollNo: 'EE-204', city: 'City A' },
-  ];
+  // Clean query and search matching records
+  const searchResults = query.trim() 
+    ? mockStudents.filter(s => 
+        s.name.toLowerCase().includes(query.toLowerCase()) || 
+        s.rollNo.toLowerCase().includes(query.toLowerCase()) ||
+        s.city.toLowerCase().includes(query.toLowerCase())
+      )
+    : [];
 
   return (
     <div className="app-container animate-fade-in">
@@ -37,7 +41,7 @@ function SearchStudent() {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1rem' }}>
-        {query && results.map(student => (
+        {query && searchResults.map(student => (
           <div 
             key={student.id} 
             className="card" 
@@ -55,7 +59,7 @@ function SearchStudent() {
             </div>
           </div>
         ))}
-        {query && results.length === 0 && (
+        {query && searchResults.length === 0 && (
           <div style={{ textAlign: 'center', padding: '2rem', color: 'rgba(128, 90, 64, 0.6)' }}>
             No students found matching "{query}"
           </div>

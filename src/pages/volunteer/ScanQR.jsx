@@ -2,44 +2,17 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import { ArrowLeft, Search, RefreshCw, Camera } from 'lucide-react';
+import { parseQRPayload } from '../../utils/studentData';
 
 function ScanQR() {
   const navigate = useNavigate();
-  const [status, setStatus] = useState('initializing'); // 'initializing', 'scanning', 'detected', 'denied'
+  const [status, setStatus] = useState('scanning'); // 'scanning', 'detected', 'denied'
   const [error, setError] = useState(null);
   const scanProcessedRef = useRef(false);
 
   useEffect(() => {
-    let active = true;
-
-    const startScanningFlow = async () => {
-      setStatus('initializing');
-      setError(null);
-      scanProcessedRef.current = false;
-      
-      try {
-        // Request camera permission explicitly first to ensure standard browser prompt
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-        // Immediately close the permission check stream
-        stream.getTracks().forEach(track => track.stop());
-        
-        if (active) {
-          setStatus('scanning');
-        }
-      } catch (err) {
-        console.error('Camera permission or accessibility error:', err);
-        if (active) {
-          setStatus('denied');
-          setError('Camera permission required for QR scan.');
-        }
-      }
-    };
-
-    startScanningFlow();
-
-    return () => {
-      active = false;
-    };
+    // Reset scanner state on mount
+    scanProcessedRef.current = false;
   }, []);
 
   const handleScan = (result) => {
@@ -47,13 +20,21 @@ function ScanQR() {
     if (scanProcessedRef.current) return;
     
     if (result && result[0]?.rawValue) {
-      const text = result[0].rawValue;
+      const rawText = result[0].rawValue;
       scanProcessedRef.current = true;
       setStatus('detected');
       
+      // Parse standardized QR payload (JSON, delimited, or plain string ID)
+      const studentData = parseQRPayload(rawText);
+      
       // Stop scanner instantly by unmounting, and navigate to confirmation screen
       setTimeout(() => {
-        navigate('/volunteer/confirm', { state: { qrData: text } });
+        navigate('/volunteer/confirm', { 
+          state: { 
+            student: studentData, 
+            qrData: studentData?.rollNo || rawText 
+          } 
+        });
       }, 600);
     }
   };
@@ -62,17 +43,20 @@ function ScanQR() {
     console.error('Scanner device error:', err);
     setStatus('denied');
     setError('Camera permission required for QR scan.');
+    localStorage.removeItem('camera_permission_granted');
   };
 
   const handleRetryPermission = async () => {
-    setStatus('initializing');
+    setStatus('scanning');
     setError(null);
     scanProcessedRef.current = false;
     
     try {
+      // Trigger user gesture stream request to re-enable permission
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       stream.getTracks().forEach(track => track.stop());
-      setStatus('scanning');
+      localStorage.setItem('camera_permission_granted', 'true');
+      window.location.reload(); // Reload to remount cleaner camera container
     } catch (err) {
       console.error('Permission retry failed:', err);
       setStatus('denied');
@@ -99,13 +83,6 @@ function ScanQR() {
       {/* Main scan / state viewport */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative', width: '100%', height: '100%' }}>
         
-        {status === 'initializing' && (
-          <div style={{ textAlign: 'center', padding: '2rem', zIndex: 5 }}>
-            <RefreshCw size={44} style={{ color: 'var(--secondary-color)', marginBottom: '1rem', animation: 'spin 1.5s linear infinite' }} />
-            <p style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.95rem' }}>Initializing camera preview...</p>
-          </div>
-        )}
-
         {status === 'denied' && (
           <div style={{ textAlign: 'center', padding: '2rem', maxWidth: '320px', zIndex: 10 }}>
             <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.15)', border: '1px solid var(--error-color)', padding: '1.5rem', borderRadius: 'var(--border-radius-md)', marginBottom: '1.5rem' }}>
@@ -226,10 +203,6 @@ function ScanQR() {
           @keyframes pulse {
             0%, 100% { transform: scale(1); opacity: 1; }
             50% { transform: scale(1.4); opacity: 0.5; }
-          }
-          @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
           }
         `}
       </style>

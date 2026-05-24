@@ -8,8 +8,8 @@ function Confirmation() {
   const { student, qrData } = location.state || {};
   
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]); // Default to today
-  const event = "Morning Session"; // Mock from context/state
-  const city = "City A"; // Mock from context/state
+  const city = localStorage.getItem('volunteer_city') || student?.city || "City A";
+  const event = localStorage.getItem('volunteer_event') || "Morning Session";
 
   const handleSubmit = () => {
     import('../../utils/offline').then(({ saveToOfflineQueue, syncOfflineQueue }) => {
@@ -39,8 +39,8 @@ function Confirmation() {
           <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: 'rgba(212, 175, 55, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
             <CheckCircle size={40} color="var(--secondary-color)" />
           </div>
-          <h2 style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>{student?.name || "Aman Singh"}</h2>
-          <p style={{ fontSize: '1.1rem', color: 'rgba(128, 90, 64, 0.7)', margin: 0 }}>{student?.rollNo || qrData || "CS-101"}</p>
+          <h2 style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>{student?.name || `Student (${student?.rollNo || qrData})`}</h2>
+          <p style={{ fontSize: '1.1rem', color: 'rgba(128, 90, 64, 0.7)', margin: 0 }}>{student?.rollNo || qrData || "Unknown ID"}</p>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '2rem', flex: 1 }}>

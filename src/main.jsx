@@ -14,6 +14,15 @@ if ('serviceWorker' in navigator) {
         console.error('ServiceWorker registration failed: ', error);
       });
   });
+
+  // Reload the page when the active service worker changes (new version takes over)
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!refreshing) {
+      refreshing = true;
+      window.location.reload();
+    }
+  });
 }
 
 createRoot(document.getElementById('root')).render(
