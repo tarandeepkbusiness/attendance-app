@@ -1,42 +1,57 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Scanner } from '@yudiel/react-qr-scanner';
-import { ArrowLeft, Search, RefreshCw, Camera } from 'lucide-react';
+import { ArrowLeft, Search, RefreshCw, Camera, CheckCircle, Calendar, MapPin, Tag, UserPlus } from 'lucide-react';
 import { parseQRPayload } from '../../utils/studentData';
-
+import { saveToOfflineQueue, syncOfflineQueue } from '../../utils/offline';
 function ScanQR() {
   const navigate = useNavigate();
-  const [status, setStatus] = useState('scanning'); // 'scanning', 'detected', 'denied'
+  const [status, setStatus] = useState('scanning'); // 'scanning', 'confirming', 'success', 'denied'
   const [error, setError] = useState(null);
+  
+  const [scannedStudent, setScannedStudent] = useState(null);
+  const [scannedRaw, setScannedRaw] = useState('');
+  
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const city = localStorage.getItem('volunteer_city') || "City A";
+  const event = localStorage.getItem('volunteer_event') || "Morning Session";
+  
   const scanProcessedRef = useRef(false);
 
   useEffect(() => {
-    // Reset scanner state on mount
     scanProcessedRef.current = false;
   }, []);
 
   const handleScan = (result) => {
-    // Process only the first valid scan detect
     if (scanProcessedRef.current) return;
     
     if (result && result[0]?.rawValue) {
       const rawText = result[0].rawValue;
       scanProcessedRef.current = true;
-      setStatus('detected');
+      setScannedRaw(rawText);
       
-      // Parse standardized QR payload (JSON, delimited, or plain string ID)
       const studentData = parseQRPayload(rawText);
+      setScannedStudent(studentData);
       
-      // Stop scanner instantly by unmounting, and navigate to confirmation screen
-      setTimeout(() => {
-        navigate('/volunteer/confirm', { 
-          state: { 
-            student: studentData, 
-            qrData: studentData?.rollNo || rawText 
-          } 
-        });
-      }, 600);
+      setStatus('confirming');
     }
+  };
+
+  const handleSubmitConfirmation = () => {
+    saveToOfflineQueue({ student: scannedStudent, qrData: scannedRaw, date, event, city });
+    if (navigator.onLine) {
+      syncOfflineQueue();
+    }
+    setStatus('success');
+  };
+  
+  const handleScanNext = () => {
+    setStatus('scanning');
+    setScannedStudent(null);
+    setScannedRaw('');
+    setTimeout(() => {
+      scanProcessedRef.current = false;
+    }, 500);
   };
 
   const handleError = (err) => {
@@ -115,14 +130,95 @@ function ScanQR() {
           </div>
         )}
 
-        {status === 'detected' && (
-          <div style={{ textAlign: 'center', padding: '2rem', zIndex: 10 }}>
-            <div style={{ backgroundColor: 'rgba(34, 197, 94, 0.15)', border: '1px solid var(--success-color)', padding: '1.5rem', borderRadius: 'var(--border-radius-md)' }}>
-              <p style={{ color: '#4ade80', fontWeight: '700', fontSize: '1.1rem', marginBottom: '0.5rem' }}>QR Code Detected!</p>
-              <p style={{ fontSize: '0.9rem', color: 'rgba(255, 255, 255, 0.8)', margin: 0 }}>
-                QR detected, loading student details.
-              </p>
+        {status === 'confirming' && (
+          <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 20, display: 'flex', flexDirection: 'column', padding: '1.5rem', paddingTop: '80px', boxSizing: 'border-box' }}>
+            <div className="card" style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '2rem 1.5rem', backgroundColor: 'var(--bg-color)', color: 'var(--text-color)', borderRadius: '24px', overflowY: 'auto' }}>
+              <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+                <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: 'rgba(212, 175, 55, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
+                  <CheckCircle size={40} color="var(--secondary-color)" />
+                </div>
+                <h2 style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>{scannedStudent?.name || `Student (${scannedStudent?.rollNo || scannedRaw})`}</h2>
+                <p style={{ fontSize: '1.1rem', color: 'rgba(128, 90, 64, 0.7)', margin: 0 }}>{scannedStudent?.rollNo || scannedRaw || "Unknown ID"}</p>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '2rem', flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem', backgroundColor: 'rgba(128, 90, 64, 0.03)', borderRadius: '12px' }}>
+                  <MapPin size={20} color="var(--secondary-color)" />
+                  <div>
+                    <p style={{ margin: 0, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'rgba(128, 90, 64, 0.6)' }}>City</p>
+                    <p style={{ margin: 0, fontWeight: '500' }}>{city}</p>
+                  </div>
+                </div>
+                
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem', backgroundColor: 'rgba(128, 90, 64, 0.03)', borderRadius: '12px' }}>
+                  <Tag size={20} color="var(--secondary-color)" />
+                  <div>
+                    <p style={{ margin: 0, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'rgba(128, 90, 64, 0.6)' }}>Event</p>
+                    <p style={{ margin: 0, fontWeight: '500' }}>{event}</p>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem', backgroundColor: 'rgba(128, 90, 64, 0.03)', borderRadius: '12px' }}>
+                  <Calendar size={20} color="var(--secondary-color)" />
+                  <div style={{ flex: 1 }}>
+                    <p style={{ margin: 0, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'rgba(128, 90, 64, 0.6)' }}>Date</p>
+                    <input 
+                      type="date" 
+                      value={date} 
+                      onChange={(e) => setDate(e.target.value)}
+                      style={{ 
+                        width: '100%', 
+                        border: 'none', 
+                        backgroundColor: 'transparent', 
+                        padding: 0, 
+                        margin: 0, 
+                        fontWeight: '500', 
+                        color: 'var(--text-color)',
+                        outline: 'none'
+                      }} 
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <button className="btn-secondary" onClick={handleScanNext} style={{ flex: 1, padding: '1rem' }}>
+                  Cancel
+                </button>
+                <button className="btn-primary" onClick={handleSubmitConfirmation} style={{ flex: 2, padding: '1rem' }}>
+                  Submit
+                </button>
+              </div>
             </div>
+          </div>
+        )}
+
+        {status === 'success' && (
+          <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
+            <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: 'rgba(34, 197, 94, 0.15)', border: '2px solid var(--success-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.5rem', animation: 'scaleIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)' }}>
+              <CheckCircle size={40} color="var(--success-color)" />
+            </div>
+            
+            <h2 style={{ color: 'white', marginBottom: '0.5rem', fontSize: '1.75rem', textAlign: 'center' }}>Attendance Recorded!</h2>
+            <p style={{ color: 'rgba(255,255,255,0.7)', textAlign: 'center', marginBottom: '2.5rem' }}>
+              {scannedStudent?.name || `Student (${scannedStudent?.rollNo || scannedRaw})`} has been checked in.
+            </p>
+            
+            <button 
+              className="btn-primary" 
+              onClick={handleScanNext}
+              style={{ padding: '1.25rem', width: '100%', maxWidth: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', fontSize: '1.1rem' }}
+            >
+              <Camera size={20} />
+              Scan Next Person
+            </button>
+            
+            <button 
+              onClick={() => navigate('/volunteer/search')}
+              style={{ marginTop: '1.5rem', background: 'none', border: 'none', color: 'rgba(255,255,255,0.6)', textDecoration: 'underline', padding: '0.5rem' }}
+            >
+              Or enter manually
+            </button>
           </div>
         )}
 
@@ -132,7 +228,7 @@ function ScanQR() {
             <Scanner 
               onScan={handleScan}
               onError={handleError}
-              formats={['qr_code']}
+              paused={status !== 'scanning'}
               allowMultiple={false}
               scanDelay={250}
               constraints={{ 
@@ -209,6 +305,10 @@ function ScanQR() {
           @keyframes pulse {
             0%, 100% { transform: scale(1); opacity: 1; }
             50% { transform: scale(1.4); opacity: 0.5; }
+          }
+          @keyframes scaleIn {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
           }
         `}
       </style>
