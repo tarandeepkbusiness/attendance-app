@@ -132,8 +132,14 @@ function ScanQR() {
             <Scanner 
               onScan={handleScan}
               onError={handleError}
+              formats={['qr_code']}
               allowMultiple={false}
               scanDelay={250}
+              constraints={{ 
+                facingMode: 'environment',
+                width: { ideal: 1920 },
+                height: { ideal: 1080 }
+              }}
               components={{
                 audio: false,
                 finder: false

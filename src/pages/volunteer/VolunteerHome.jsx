@@ -31,24 +31,8 @@ function VolunteerHome() {
     return () => window.removeEventListener('storage', loadQueueCount);
   }, [city, event, activity, navigate]);
 
-  const handleScanClick = async () => {
-    const isGranted = localStorage.getItem('camera_permission_granted');
-    if (isGranted === 'true') {
-      navigate('/volunteer/scan');
-      return;
-    }
-
-    try {
-      // Trigger camera request directly within the click handler user gesture
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-      stream.getTracks().forEach(track => track.stop());
-      localStorage.setItem('camera_permission_granted', 'true');
-      navigate('/volunteer/scan');
-    } catch (err) {
-      console.warn('Camera request inside click handler denied:', err);
-      // Navigate anyway so the scan page shows the permission denied screen
-      navigate('/volunteer/scan');
-    }
+  const handleScanClick = () => {
+    navigate('/volunteer/scan');
   };
 
   return (
