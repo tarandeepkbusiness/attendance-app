@@ -4,6 +4,9 @@ import { Scanner } from '@yudiel/react-qr-scanner';
 import { ArrowLeft, Search, RefreshCw, Camera, CheckCircle, Calendar, MapPin, Tag, UserPlus } from 'lucide-react';
 import { parseQRPayload } from '../../utils/studentData';
 import { saveToOfflineQueue, syncOfflineQueue } from '../../utils/offline';
+
+const ELECTIVE_ACTIVITIES = ['AI', 'Clay Modelling', 'Cooking', 'Dolki', 'Knitting-Crochet', 'Painting', 'Paper Craft', 'Photography', 'Resin Art', 'Tabla', 'Vocal'];
+
 function ScanQR() {
   const navigate = useNavigate();
   const [status, setStatus] = useState('scanning'); // 'scanning', 'confirming', 'success', 'denied'
@@ -15,6 +18,8 @@ function ScanQR() {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const city = localStorage.getItem('volunteer_city') || "City A";
   const event = localStorage.getItem('volunteer_event') || "Morning Session";
+  const activity = localStorage.getItem('volunteer_activity') || "";
+  const [mandatoryWarning, setMandatoryWarning] = useState(null);
   
   const scanProcessedRef = useRef(false);
 
@@ -34,11 +39,25 @@ function ScanQR() {
       setScannedStudent(studentData);
       
       setStatus('confirming');
+      setMandatoryWarning(null);
+
+      if (ELECTIVE_ACTIVITIES.includes(activity)) {
+        const rollNo = studentData?.rollNo || rawText;
+        const API_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxCNRPi8VzffFG49HMXeQYKgkJPG2BzBPbqm9mvjFG-WdCXeLrDWjgQUnXKoTRp650O/exec';
+        fetch(`${API_ENDPOINT}?action=checkMandatory&rollNumber=${encodeURIComponent(rollNo)}`)
+          .then(res => res.json())
+          .then(data => {
+            if (data && data.missed) {
+              setMandatoryWarning(`⚠️ Student has not attended ${data.missed} today.`);
+            }
+          })
+          .catch(e => console.error("Failed to check mandatory", e));
+      }
     }
   };
 
   const handleSubmitConfirmation = () => {
-    saveToOfflineQueue({ student: scannedStudent, qrData: scannedRaw, date, event, city });
+    saveToOfflineQueue({ student: scannedStudent, qrData: scannedRaw, date, event, city, activity });
     if (navigator.onLine) {
       syncOfflineQueue();
     }
@@ -180,6 +199,12 @@ function ScanQR() {
                   </div>
                 </div>
               </div>
+
+              {mandatoryWarning && (
+                <div style={{ backgroundColor: '#FFBF00', color: '#000', padding: '1rem', borderRadius: '12px', marginBottom: '1.5rem', fontWeight: '600', fontSize: '0.95rem', display: 'flex', alignItems: 'center', boxShadow: '0 4px 6px rgba(255, 191, 0, 0.3)' }}>
+                  {mandatoryWarning}
+                </div>
+              )}
 
               <div style={{ display: 'flex', gap: '1rem' }}>
                 <button className="btn-secondary" onClick={handleScanNext} style={{ flex: 1, padding: '1rem' }}>

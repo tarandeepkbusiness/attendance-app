@@ -11,7 +11,7 @@ const MAJOR_EVENTS = [
 
 function SelectEvent() {
   const navigate = useNavigate();
-  const [selectedEvent, setSelectedEvent] = useState(localStorage.getItem('volunteer_event') || '');
+  const [selectedEvent, setSelectedEvent] = useState(localStorage.getItem('volunteer_event') || 'Summer Camp');
 
   const handleSelect = (event) => {
     setSelectedEvent(event);

@@ -2,6 +2,7 @@ const CACHE_NAME = 'attendance-app-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
+  './index.html',
   '/logo.png',
   '/icon-512.png',
   '/manifest.json'
@@ -32,17 +33,17 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Bypass non-GET requests or requests from other origins (except fonts)
+  // Bypass non-GET requests
   if (event.request.method !== 'GET') return;
   
   const url = new URL(event.request.url);
   const isSelfOrigin = url.origin === self.location.origin;
   
-  // Handle SPA navigation: route direct document navigations to cached index.html
-  if (event.request.mode === 'navigate') {
+  // Handle SPA navigation: network first, then cache fallback
+  if (event.request.mode === 'navigate' || event.request.headers.get('accept').includes('text/html')) {
     event.respondWith(
       fetch(event.request).catch(() => {
-        return caches.match('/index.html') || caches.match('/');
+        return caches.match('./index.html') || caches.match('/index.html') || caches.match('/');
       })
     );
     return;

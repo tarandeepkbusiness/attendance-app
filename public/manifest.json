@@ -2,10 +2,10 @@
   "name": "Attendance App",
   "short_name": "Attendance",
   "description": "Mobile-only offline-first attendance tracking system for volunteer events.",
-  "start_url": "/",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#FAF9F6",
-  "theme_color": "#D4AF37",
+  "theme_color": "#FAF9F6",
   "orientation": "portrait-primary",
   "icons": [
     {

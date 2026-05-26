@@ -2,14 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Tag, ChevronRight } from 'lucide-react';
 
-const SAMPLE_ACTIVITIES = [
-  'Tabla classes',
-  'Punjabi learning class',
-  'Sports classes',
-  'Kirtan practice',
-  'Yoga / meditation session',
-  'Reading / study session'
-];
+const MANDATORY_ACTIVITIES = ['Meditation', 'Sudh Gurbani'];
+const ELECTIVE_ACTIVITIES = ['AI', 'Clay Modelling', 'Cooking', 'Dolki', 'Knitting-Crochet', 'Painting', 'Paper Craft', 'Photography', 'Resin Art', 'Tabla', 'Vocal'];
 
 function SelectActivity() {
   const navigate = useNavigate();
@@ -20,6 +14,31 @@ function SelectActivity() {
     localStorage.setItem('volunteer_activity', activity);
     navigate('/volunteer/home');
   };
+
+  const renderActivityButton = (activity) => (
+    <button 
+      key={activity}
+      onClick={() => handleSelect(activity)}
+      className="card"
+      style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'space-between',
+        padding: '1.25rem',
+        border: selectedActivity === activity ? '2px solid var(--secondary-color)' : '1px solid rgba(212, 175, 55, 0.2)',
+        width: '100%',
+        textAlign: 'left',
+        cursor: 'pointer',
+        backgroundColor: selectedActivity === activity ? 'rgba(212, 175, 55, 0.05)' : 'white'
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <Tag size={20} color={selectedActivity === activity ? 'var(--secondary-color)' : 'rgba(128, 90, 64, 0.5)'} />
+        <span style={{ fontWeight: '500', color: 'var(--text-color)' }}>{activity}</span>
+      </div>
+      <ChevronRight size={20} color="rgba(128, 90, 64, 0.3)" />
+    </button>
+  );
 
   return (
     <div className="app-container animate-fade-in" style={{ padding: '1.5rem', paddingBottom: '80px' }}>
@@ -34,31 +53,20 @@ function SelectActivity() {
         Which activity are you marking?
       </p>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-        {SAMPLE_ACTIVITIES.map((activity) => (
-          <button 
-            key={activity}
-            onClick={() => handleSelect(activity)}
-            className="card"
-            style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'space-between',
-              padding: '1.25rem',
-              border: selectedActivity === activity ? '2px solid var(--secondary-color)' : '1px solid rgba(212, 175, 55, 0.2)',
-              width: '100%',
-              textAlign: 'left',
-              cursor: 'pointer',
-              backgroundColor: selectedActivity === activity ? 'rgba(212, 175, 55, 0.05)' : 'white'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <Tag size={20} color={selectedActivity === activity ? 'var(--secondary-color)' : 'rgba(128, 90, 64, 0.5)'} />
-              <span style={{ fontWeight: '500', color: 'var(--text-color)' }}>{activity}</span>
-            </div>
-            <ChevronRight size={20} color="rgba(128, 90, 64, 0.3)" />
-          </button>
-        ))}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <div>
+          <h3 style={{ fontSize: '1rem', color: 'rgba(128, 90, 64, 0.8)', marginBottom: '0.75rem' }}>Mandatory Activities</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {MANDATORY_ACTIVITIES.map(renderActivityButton)}
+          </div>
+        </div>
+        
+        <div>
+          <h3 style={{ fontSize: '1rem', color: 'rgba(128, 90, 64, 0.8)', marginBottom: '0.75rem' }}>Electives</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {ELECTIVE_ACTIVITIES.map(renderActivityButton)}
+          </div>
+        </div>
       </div>
 
       <button 

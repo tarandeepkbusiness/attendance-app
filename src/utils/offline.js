@@ -53,6 +53,7 @@ export const syncOfflineQueue = async () => {
           rollNumber: record.student?.rollNo || record.qrData || "Unknown",
           city: record.city,
           event: record.event,
+          activity: record.activity,
           volunteerId: record.student?.volunteerId || "V001",
           timestamp: record.timestamp
         })
