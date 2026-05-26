@@ -52,10 +52,9 @@ export const syncOfflineQueue = async () => {
           studentName: record.student?.name || "Scan Result",
           rollNumber: record.student?.rollNo || record.qrData || "Unknown",
           city: record.city,
-          event: record.event,
+          event: 'Summer Camp',
           activity: record.activity,
-          volunteerId: record.student?.volunteerId || "V001",
-          timestamp: record.timestamp
+          volunteerId: record.student?.volunteerId || "V001"
         })
       });
       

@@ -3,10 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Calendar, ChevronRight } from 'lucide-react';
 
 const MAJOR_EVENTS = [
-  'Summer Camp',
-  'Meditation Camp',
-  'Gurmat Camp',
-  'Youth Program'
+  'Summer Camp'
 ];
 
 function SelectEvent() {
