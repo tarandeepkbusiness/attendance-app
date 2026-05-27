@@ -51,10 +51,11 @@ export const syncOfflineQueue = async () => {
         body: JSON.stringify({
           studentName: record.student?.name || "Scan Result",
           rollNumber: record.student?.rollNo || record.qrData || "Unknown",
-          city: record.city,
+          city: record.city || "Unknown",
           event: 'Summer Camp',
           activity: record.activity,
-          volunteerId: record.student?.volunteerId || "V001"
+          volunteerId: record.volunteerId || 'V001',
+          status: "Present"
         })
       });
       
