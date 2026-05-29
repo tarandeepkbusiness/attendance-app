@@ -31,33 +31,7 @@ function Confirmation() {
     }
 
     if (navigator.onLine) {
-      try {
-        const API_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxRL6ZILuXNm_uKN8jxMBXjXs_p0WHeAugCTuT756i3utrS70mnFJspljI2jTLolO4q/exec';
-        const res = await fetch(API_ENDPOINT, {
-          method: 'POST',
-          mode: 'cors',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({
-            studentName: student?.name || "Scan Result",
-            rollNumber: student?.rollNo || qrData || "Unknown",
-            city: city || "Unknown",
-            event: 'Summer Camp',
-            activity: activity,
-            volunteerId: 'V001'
-          })
-        });
-        if (res.ok) {
-          try {
-            const data = await res.json();
-            if (data && (data.status === 'already_marked' || data.result === 'already_marked' || data.already_marked)) {
-               navigate('/volunteer/duplicate');
-               return;
-            }
-          } catch(e) {}
-        }
-      } catch(e) {
-        console.error('Immediate online submission failed, falling back to offline queue', e);
-      }
+      // Background sync will handle it
     }
     
     import('../../utils/offline').then(({ saveToOfflineQueue, syncOfflineQueue }) => {

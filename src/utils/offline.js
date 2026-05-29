@@ -44,9 +44,9 @@ export const syncOfflineQueue = async () => {
       // Real API POST call to Google Apps Script
       const response = await fetch(API_ENDPOINT, {
         method: 'POST',
-        mode: 'cors',
+        mode: 'no-cors',
         headers: {
-          'Content-Type': 'text/plain;charset=utf-8' // Simple content type avoids CORS preflight OPTIONS block
+          'Content-Type': 'text/plain;charset=utf-8' 
         },
         body: JSON.stringify({
           studentName: record.student?.name || "Scan Result",
@@ -54,7 +54,8 @@ export const syncOfflineQueue = async () => {
           city: record.city || "Unknown",
           event: 'Summer Camp',
           activity: record.activity,
-          volunteerId: record.volunteerId || 'V001'
+          volunteerId: record.volunteerId || 'V001',
+          status: 'Present' // Put this back just in case the sheet expects exactly 8 columns (including timestamp)
         })
       });
       
