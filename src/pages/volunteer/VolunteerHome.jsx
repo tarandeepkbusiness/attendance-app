@@ -5,7 +5,7 @@ import { Camera, Search, WifiOff, MapPin, Calendar, Tag, Edit3 } from 'lucide-re
 function VolunteerHome() {
   const navigate = useNavigate();
   const [city, setCity] = useState(localStorage.getItem('volunteer_city') || '');
-  const [event, setEvent] = useState(localStorage.getItem('volunteer_event') || '');
+  const [event] = useState('Summer Camp');
   const [activity, setActivity] = useState(localStorage.getItem('volunteer_activity') || '');
   
   // Refresh queue count
@@ -15,8 +15,6 @@ function VolunteerHome() {
     // If selections are missing, redirect back to the wizard
     if (!city) {
       navigate('/volunteer/select-city', { replace: true });
-    } else if (!event) {
-      navigate('/volunteer/select-event', { replace: true });
     } else if (!activity) {
       navigate('/volunteer/select-activity', { replace: true });
     }

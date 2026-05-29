@@ -70,10 +70,10 @@ function SelectActivity() {
       </div>
 
       <button 
-        onClick={() => navigate('/volunteer/select-event')}
+        onClick={() => navigate('/volunteer/select-city')}
         style={{ marginTop: '2rem', color: 'rgba(128, 90, 64, 0.6)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
       >
-        Go back to change event
+        Go back to change city
       </button>
     </div>
   );

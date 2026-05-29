@@ -36,7 +36,7 @@ export const syncOfflineQueue = async () => {
   
   if (pending.length === 0) return { success: true, count: 0 };
 
-  const API_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxCNRPi8VzffFG49HMXeQYKgkJPG2BzBPbqm9mvjFG-WdCXeLrDWjgQUnXKoTRp650O/exec';
+  const API_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxRL6ZILuXNm_uKN8jxMBXjXs_p0WHeAugCTuT756i3utrS70mnFJspljI2jTLolO4q/exec';
 
   let syncedCount = 0;
   for (const record of pending) {
@@ -54,15 +54,24 @@ export const syncOfflineQueue = async () => {
           city: record.city || "Unknown",
           event: 'Summer Camp',
           activity: record.activity,
-          volunteerId: record.volunteerId || 'V001',
-          status: "Present"
+          volunteerId: record.volunteerId || 'V001'
         })
       });
       
       // Google Apps Script responses may return redirect, check response ok or opaque type
       if (response.ok || response.type === 'opaque') {
+        let responseData = null;
+        try {
+           responseData = await response.clone().json();
+        } catch(e) {}
+        
         updateRecordStatus(record.id, 'synced');
         syncedCount++;
+        
+        if (responseData && (responseData.status === 'already_marked' || responseData.result === 'already_marked' || responseData.already_marked)) {
+            // Optional: handled by the caller if needed
+            return { success: true, count: syncedCount, already_marked: true };
+        }
       } else {
         console.error('Server rejected sync:', response.status);
       }

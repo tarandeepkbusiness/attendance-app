@@ -9,7 +9,7 @@ function Duplicate() {
     <div className="app-container animate-fade-in" style={{ backgroundColor: 'var(--warning-color)' }}>
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'white', textAlign: 'center' }}>
         <AlertTriangle size={80} style={{ marginBottom: '2rem' }} />
-        <h1 style={{ fontSize: '2.5rem', marginBottom: '0.5rem', fontWeight: '700' }}>Already Marked</h1>
+        <h1 style={{ fontSize: '2.5rem', marginBottom: '0.5rem', fontWeight: '700' }}>Attendance Completed</h1>
         <p style={{ fontSize: '1.25rem', opacity: 0.9 }}>This student has already been marked for this event.</p>
       </div>
 

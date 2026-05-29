@@ -44,7 +44,7 @@ function SelectCity() {
     if (user?.type === 'Global') {
       localStorage.setItem('volunteer_city_is_default', isDefault.toString());
     }
-    navigate('/volunteer/select-event');
+    navigate('/volunteer/select-activity');
   };
 
   return (

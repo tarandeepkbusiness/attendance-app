@@ -43,7 +43,7 @@ function ScanQR() {
 
       if (ELECTIVE_ACTIVITIES.includes(activity)) {
         const rollNo = studentData?.rollNo || rawText;
-        const API_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxCNRPi8VzffFG49HMXeQYKgkJPG2BzBPbqm9mvjFG-WdCXeLrDWjgQUnXKoTRp650O/exec';
+        const API_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxRL6ZILuXNm_uKN8jxMBXjXs_p0WHeAugCTuT756i3utrS70mnFJspljI2jTLolO4q/exec';
         fetch(`${API_ENDPOINT}?action=checkMandatory&rollNumber=${encodeURIComponent(rollNo)}`)
           .then(res => res.json())
           .then(data => {
