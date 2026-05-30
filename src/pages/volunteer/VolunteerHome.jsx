@@ -12,7 +12,7 @@ function VolunteerHome() {
   const [pendingCount, setPendingCount] = useState(0);
 
   useEffect(() => {
-    // If selections are missing, redirect back to the wizard
+    // Select your location
     if (!city) {
       navigate('/volunteer/select-city', { replace: true });
     } else if (!activity) {

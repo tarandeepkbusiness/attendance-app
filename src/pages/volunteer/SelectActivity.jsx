@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Tag, ChevronRight } from 'lucide-react';
 
-const MANDATORY_ACTIVITIES = ['Meditation', 'Sudh Gurbani'];
-const ELECTIVE_ACTIVITIES = ['AI', 'Clay Modelling', 'Cooking', 'Dolki', 'Knitting-Crochet', 'Painting', 'Paper Craft', 'Photography', 'Resin Art', 'Tabla', 'Vocal'];
+const MANDATORY_ACTIVITIES = ['Meditation & Sudh Gurbani'];
+const ELECTIVE_ACTIVITIES = ['AI', 'Clay Modelling', 'Cooking', 'Dholki', 'Knitting-Crochet', 'Painting', 'Paper Craft', 'Photography', 'Resin Art', 'Tabla', 'Vocal'];
 
 function SelectActivity() {
   const navigate = useNavigate();

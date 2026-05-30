@@ -36,7 +36,7 @@ export const syncOfflineQueue = async () => {
   
   if (pending.length === 0) return { success: true, count: 0 };
 
-  const API_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxRL6ZILuXNm_uKN8jxMBXjXs_p0WHeAugCTuT756i3utrS70mnFJspljI2jTLolO4q/exec';
+  const API_ENDPOINT = 'https://script.google.com/macros/s/AKfycbzvKaVpmlynSi30iHPcOcGIf1qpYrBquuzMto1L67Wth8hOs1WwAb9CG94e-t67Y8fl/exec';
 
   let syncedCount = 0;
   for (const record of pending) {

@@ -21,56 +21,47 @@ function ScanQR() {
   const activity = localStorage.getItem('volunteer_activity') || "";
   const [mandatoryWarning, setMandatoryWarning] = useState(null);
   
-  const scanProcessedRef = useRef(false);
+  
+  const scanProcessedRef = useRef(new Set());
 
   useEffect(() => {
-    scanProcessedRef.current = false;
+    scanProcessedRef.current = new Set();
   }, []);
 
   const handleScan = (result) => {
-    if (scanProcessedRef.current) return;
-    
     if (result && result[0]?.rawValue) {
       const rawText = result[0].rawValue;
-      scanProcessedRef.current = true;
-      setScannedRaw(rawText);
+      
+      if (scanProcessedRef.current.has(rawText)) return;
+      
+      scanProcessedRef.current.add(rawText);
       
       const studentData = parseQRPayload(rawText);
       setScannedStudent(studentData);
-      
-      setStatus('confirming');
-      setMandatoryWarning(null);
+      setScannedRaw(rawText);
 
-      if (ELECTIVE_ACTIVITIES.includes(activity)) {
-        const rollNo = studentData?.rollNo || rawText;
-        const API_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxRL6ZILuXNm_uKN8jxMBXjXs_p0WHeAugCTuT756i3utrS70mnFJspljI2jTLolO4q/exec';
-        fetch(`${API_ENDPOINT}?action=checkMandatory&rollNumber=${encodeURIComponent(rollNo)}`)
-          .then(res => res.json())
-          .then(data => {
-            if (data && data.missed) {
-              setMandatoryWarning(`⚠️ Student has not attended ${data.missed} today.`);
-            }
-          })
-          .catch(e => console.error("Failed to check mandatory", e));
+      saveToOfflineQueue({ student: studentData, qrData: rawText, date, event, city, activity });
+      if (navigator.onLine) {
+        syncOfflineQueue();
       }
+      
+      setStatus('success');
+      
+      setTimeout(() => {
+        setStatus('scanning');
+        setScannedStudent(null);
+        setScannedRaw('');
+        setTimeout(() => {
+            scanProcessedRef.current.delete(rawText);
+        }, 2000);
+      }, 1500);
     }
-  };
-
-  const handleSubmitConfirmation = () => {
-    saveToOfflineQueue({ student: scannedStudent, qrData: scannedRaw, date, event, city, activity });
-    if (navigator.onLine) {
-      syncOfflineQueue();
-    }
-    setStatus('success');
   };
   
   const handleScanNext = () => {
     setStatus('scanning');
     setScannedStudent(null);
     setScannedRaw('');
-    setTimeout(() => {
-      scanProcessedRef.current = false;
-    }, 500);
   };
 
   const handleError = (err) => {
