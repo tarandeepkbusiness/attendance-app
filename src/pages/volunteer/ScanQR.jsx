@@ -106,9 +106,14 @@ function ScanQR() {
         <label htmlFor="autoScanToggle" style={{ color: '#fff' }}>Auto‑Scan</label>
         {statusMsg && <span style={{ marginLeft: 'auto', color: '#22c55e', fontWeight: '600' }}>{statusMsg}</span>}
       </div>
+{amberAlert && (
+        <div style={{ width: '90%', background: '#ba3906', color: '#fff', padding: '12px 16px', borderRadius: '8px', textAlign: 'center', marginBottom: '12px', pointerEvents: 'none' }}>
+    {amberAlert.msg}
+  </div>
+)}
 
       {/* Main scanning area */}
-      <div style={{ flex: 1, position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+      <div style={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
         {/* Dark overlay */}
         <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', pointerEvents: 'none' }} />
         {/* Centered square scanner */}
@@ -126,17 +131,10 @@ function ScanQR() {
         </div>
         {/* Error UI */}
         {error && (
-          <div style={{ position: 'absolute', top: '10%', left: '50%', transform: 'translateX(-50%)', background: 'rgba(255,0,0,0.3)', padding: '0.75rem 1rem', borderRadius: '8px' }}>
-            <p>{error}</p>
+            <div style={{ position: 'absolute', top: '10%', left: '50%', transform: 'translateX(-50%)', background: 'rgba(255,0,0,0.3)', padding: '0.75rem 1rem', borderRadius: '8px' }}>            <p>{error}</p>
             <button onClick={retryPermission} style={{ marginTop: '0.5rem', background: '#fff', color: '#000', border: 'none', padding: '0.4rem 0.8rem', borderRadius: '4px' }}>
               <Camera size={16} /> Retry Permission
             </button>
-          </div>
-        )}
-        {/* Amber floating alert */}
-        {amberAlert && (
-          <div style={{ position: 'absolute', bottom: '5%', left: '50%', transform: 'translateX(-50%)', background: '#FFBF00', color: '#000', padding: '0.6rem 1rem', borderRadius: '8px', boxShadow: '0 4px 6px rgba(255,191,0,0.3)' }}>
-            {amberAlert.msg}
           </div>
         )}
       </div>
