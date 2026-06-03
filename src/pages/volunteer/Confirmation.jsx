@@ -7,9 +7,10 @@ function Confirmation() {
   const location = useLocation();
   const { student, qrData } = location.state || {};
   
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]); // Default to today
-  const city = localStorage.getItem('volunteer_city') || student?.city || "City A";
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const city = localStorage.getItem('volunteer_city') || "City A";
   const event = localStorage.getItem('volunteer_event') || "Morning Session";
+  const activity = localStorage.getItem('volunteer_activity') || "";
 
   const handleSubmit = async () => {
     const activity = localStorage.getItem('volunteer_activity') || "";
@@ -29,13 +30,13 @@ function Confirmation() {
     } catch (e) {
       console.error("Local duplicate check failed", e);
     }
-
+    
     if (navigator.onLine) {
       // Background sync will handle it
     }
     
     import('../../utils/offline').then(({ saveToOfflineQueue, syncOfflineQueue }) => {
-      saveToOfflineQueue({ student, qrData, date, event: 'Summer Camp', city, activity });
+      saveToOfflineQueue({ student, qrData, date, event, city, activity });
       if (navigator.onLine) {
         syncOfflineQueue();
       }

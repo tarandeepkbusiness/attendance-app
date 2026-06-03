@@ -20,7 +20,9 @@ function ScanQR() {
   const city = localStorage.getItem('volunteer_city') || "City A";
   const event = localStorage.getItem('volunteer_event') || "Morning Session";
   const activity = localStorage.getItem('volunteer_activity') || "";
+  const [nameLoading, setNameLoading] = useState(false);
   const [mandatoryWarning, setMandatoryWarning] = useState(null);
+
   
   const scanProcessedRef = useRef(new Set());
 
@@ -37,9 +39,29 @@ function ScanQR() {
       try {
         const studentData = parseQRPayload(rawText);
         setScannedRaw(rawText);
-        setScannedStudent(studentData || { rollNo: rawText, name: 'Unknown Student' });
+        // Initialize scanned student with payload data or placeholder
+        const initialStudent = studentData || { rollNo: rawText, name: 'Unknown Student' };
+        setScannedStudent(initialStudent);
         setStatus('confirming');
         setMandatoryWarning(null);
+        setNameLoading(true);
+
+        // Fetch real name from backend
+        try {
+          const resp = await fetch(`${SCRIPT_URL}?action=rollLookup&rollNo=${encodeURIComponent(initialStudent.rollNo)}`);
+          if (resp.ok) {
+            const data = await resp.json();
+            if (data && data.success && data.name) {
+              setScannedStudent(prev => ({ ...prev, name: data.name, city: data.city || prev.city }));
+            } else if (data && data.message) {
+              console.warn('Roll lookup returned message:', data.message);
+            }
+          }
+        } catch (lookupErr) {
+          console.error('Failed to lookup roll info:', lookupErr);
+        } finally {
+          setNameLoading(false);
+        }
 
         // Amber Alert: Check if they attended 'Meditation & Shudh Gurbani'
         const isCompulsory = activity === 'Meditation & Shudh Gurbani' || activity === 'Meditation & Sudh Gurbani';
@@ -178,7 +200,25 @@ function ScanQR() {
                 <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: 'rgba(212, 175, 55, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
                   <CheckCircle size={40} color="var(--secondary-color)" />
                 </div>
-                <h2 style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>{scannedStudent?.name || `Student (${scannedStudent?.rollNo || scannedRaw})`}</h2>
+                <h2 style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>
+                  {nameLoading ? (
+                    <span style={{ display: 'inline-flex', alignItems: 'center' }}>
+                      <span className="loader" style={{
+                        width: '0.9rem',
+                        height: '0.9rem',
+                        border: '2px solid var(--secondary-color)',
+                        borderTop: '2px solid transparent',
+                        borderRadius: '50%',
+                        animation: 'spin 0.8s linear infinite',
+                        marginRight: '0.5rem'
+                      }} />
+                      Loading...
+                    </span>
+                  ) : (
+                    scannedStudent?.name || `Student (${scannedStudent?.rollNo || scannedRaw})`
+                  )}
+                </h2>
+
                 <p style={{ fontSize: '1.1rem', color: 'rgba(128, 90, 64, 0.7)', margin: 0 }}>{scannedStudent?.rollNo || scannedRaw || "Unknown ID"}</p>
               </div>
 
@@ -372,6 +412,10 @@ function ScanQR() {
           @keyframes pulse {
             0%, 100% { transform: scale(1); opacity: 1; }
             50% { transform: scale(1.4); opacity: 0.5; }
+          }
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
           }
           @keyframes scaleIn {
             0% { transform: scale(0.8); opacity: 0; }
