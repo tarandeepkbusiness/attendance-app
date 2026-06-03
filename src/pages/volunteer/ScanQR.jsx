@@ -1,4 +1,4 @@
-// ScanQR.jsx - rebuilt for zero-navigation, auto-scan toggle, and performance
+// ScanQR.jsx - rebuilt for Event Mode with centered square scanner, HUD status, amber floating alert, and cooldown buffer
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Scanner } from '@yudiel/react-qr-scanner';
@@ -12,87 +12,75 @@ function ScanQR() {
 
   // UI state
   const [autoScan, setAutoScan] = useState(true); // toggle for auto‑scan mode
-  const [overlayInfo, setOverlayInfo] = useState(null); // { rollNo, name?, amber? }
-  const [status, setStatus] = useState('scanning'); // 'scanning' | 'overlay'
+  const [statusMsg, setStatusMsg] = useState(''); // HUD message
+  const [amberAlert, setAmberAlert] = useState(null); // {msg}
   const [error, setError] = useState(null);
   const [date] = useState(new Date().toISOString().split('T')[0]);
   const city = localStorage.getItem('volunteer_city') || 'City A';
   const event = localStorage.getItem('volunteer_event') || 'Morning Session';
   const activity = localStorage.getItem('volunteer_activity') || '';
 
-  // Prevent processing the same QR code multiple times rapidly
-  const processedSet = useRef(new Set());
+  // Cool‑down buffer for roll numbers (3 s)
+  const cooldownRef = useRef(new Map()); // rollNo -> timeoutId
+
+  // Reset on mount
   useEffect(() => {
-    processedSet.current.clear();
+    cooldownRef.current.clear();
   }, []);
+
+  const isCompulsory = activity === 'Meditation & Shudh Gurbani' || activity === 'Meditation & Sudh Gurbani';
 
   const handleScan = async (result) => {
     if (!result?.[0]?.rawValue) return;
     const rawText = result[0].rawValue;
-    if (processedSet.current.has(rawText)) return;
-    processedSet.current.add(rawText);
-
     const payload = parseQRPayload(rawText);
     const rollNo = payload?.rollNo || rawText;
-    const overlay = { rollNo, amber: null };
 
-    // Amber‑Alert check for non‑compulsory activities
-    const isCompulsory = activity === 'Meditation & Shudh Gurbani' || activity === 'Meditation & Sudh Gurbani';
+    // Cool‑down check
+    if (cooldownRef.current.has(rollNo)) return;
+    // Add to buffer
+    const timeoutId = setTimeout(() => {
+      cooldownRef.current.delete(rollNo);
+    }, 3000);
+    cooldownRef.current.set(rollNo, timeoutId);
+
+    // Immediate UI feedback (≤100 ms)
+    setStatusMsg(`Marked: Roll ${rollNo}`);
+    // Reset HUD after 2 s
+    setTimeout(() => setStatusMsg(''), 2000);
+
+    // Save attendance async (does not block UI)
+    (async () => {
+      await saveToOfflineQueue({ student: { rollNo }, qrData: rawText, date, event, city, activity });
+      if (navigator.onLine) await syncOfflineQueue();
+    })();
+
+    // Amber alert check (background)
     if (!isCompulsory && navigator.onLine) {
       try {
         const resp = await fetch(`${SCRIPT_URL}?action=checkCompulsory&rollNo=${encodeURIComponent(rollNo)}`);
         if (resp.ok) {
           const data = await resp.json();
           if (data && data.attended === false) {
-            overlay.amber = `Roll No. ${rollNo} didn't attend Meditation and Shudh Gurbani today!`;
+            setAmberAlert({ msg: `Roll No. ${rollNo} didn't attend Meditation and Shudh Gurbani today!` });
+            setTimeout(() => setAmberAlert(null), 1500);
           }
         }
       } catch (e) {
         console.error('Compulsory check failed', e);
       }
     }
-
-    // Save attendance (auto‑scan or manual later)
-    const saveAttendance = async () => {
-      await saveToOfflineQueue({ student: { rollNo }, qrData: rawText, date, event, city, activity });
-      if (navigator.onLine) await syncOfflineQueue();
-    };
-
-    if (autoScan) {
-      await saveAttendance();
-      setOverlayInfo(overlay);
-      setStatus('overlay');
-      setTimeout(() => {
-        setStatus('scanning');
-        setOverlayInfo(null);
-        processedSet.current.clear();
-      }, overlay.amber ? 1500 : 1000);
-    } else {
-      // Manual mode – show overlay with submit button
-      setOverlayInfo({ ...overlay, manual: true });
-      setStatus('overlay');
-    }
-  };
-
-  const handleManualSubmit = async () => {
-    if (!overlayInfo) return;
-    await saveToOfflineQueue({ student: { rollNo: overlayInfo.rollNo }, qrData: overlayInfo.rollNo, date, event, city, activity });
-    if (navigator.onLine) await syncOfflineQueue();
-    setStatus('scanning');
-    setOverlayInfo(null);
-    processedSet.current.clear();
   };
 
   const handleError = (err) => {
     console.error('Scanner error:', err);
     setError('Camera permission required for QR scan.');
-    setStatus('scanning');
   };
 
   const retryPermission = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-      stream.getTracks().forEach((t) => t.stop());
+      stream.getTracks().forEach(t => t.stop());
       localStorage.setItem('camera_permission_granted', 'true');
       window.location.reload();
     } catch (e) {
@@ -101,9 +89,9 @@ function ScanQR() {
   };
 
   return (
-    <div className="app-container" style={{ backgroundColor: '#000', color: '#fff', height: '100vh', display: 'flex', flexDirection: 'column' }}>
-      {/* Header with back & search */}
-      <div style={{ padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div className="app-container" style={{ height: '100vh', backgroundColor: '#000', color: '#fff', display: 'flex', flexDirection: 'column' }}>
+      {/* Header */}
+      <div style={{ padding: '0.75rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <button onClick={() => navigate(-1)} style={{ background: 'none', border: 'none', color: '#fff' }}>
           <ArrowLeft size={20} /> Back
         </button>
@@ -112,56 +100,43 @@ function ScanQR() {
         </button>
       </div>
 
-      {/* Auto‑scan toggle */}
+      {/* Auto‑scan toggle and HUD */}
       <div style={{ padding: '0 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        <input
-          type="checkbox"
-          id="autoScanToggle"
-          checked={autoScan}
-          onChange={(e) => setAutoScan(e.target.checked)}
-        />
+        <input type="checkbox" id="autoScanToggle" checked={autoScan} onChange={e => setAutoScan(e.target.checked)} />
         <label htmlFor="autoScanToggle" style={{ color: '#fff' }}>Auto‑Scan</label>
+        {statusMsg && <span style={{ marginLeft: 'auto', color: '#22c55e', fontWeight: '600' }}>{statusMsg}</span>}
       </div>
 
-      {/* Main content */}
-      <div style={{ flex: 1, position: 'relative' }}>
-        {status === 'scanning' && (
+      {/* Main scanning area */}
+      <div style={{ flex: 1, position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        {/* Dark overlay */}
+        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', pointerEvents: 'none' }} />
+        {/* Centered square scanner */}
+        <div style={{ width: 250, height: 250, background: '#111', position: 'relative', zIndex: 1, overflow: 'hidden' }}>
           <Scanner
             onScan={handleScan}
             onError={handleError}
             paused={false}
             allowMultiple={false}
             scanDelay={250}
-            constraints={{ facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }}
+            constraints={{ facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 640 } }}
             components={{ audio: false, finder: false }}
             styles={{ container: { width: '100%', height: '100%' }, video: { width: '100%', height: '100%', objectFit: 'cover' } }}
           />
-        )}
-
-        {/* Permission error UI */}
+        </div>
+        {/* Error UI */}
         {error && (
-          <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', padding: '1rem', background: 'rgba(255,0,0,0.2)', color: '#fff' }}>
+          <div style={{ position: 'absolute', top: '10%', left: '50%', transform: 'translateX(-50%)', background: 'rgba(255,0,0,0.3)', padding: '0.75rem 1rem', borderRadius: '8px' }}>
             <p>{error}</p>
-            <button onClick={retryPermission} style={{ marginTop: '0.5rem', background: '#fff', color: '#000' }}>
+            <button onClick={retryPermission} style={{ marginTop: '0.5rem', background: '#fff', color: '#000', border: 'none', padding: '0.4rem 0.8rem', borderRadius: '4px' }}>
               <Camera size={16} /> Retry Permission
             </button>
           </div>
         )}
-
-        {/* Overlay after scan */}
-        {status === 'overlay' && overlayInfo && (
-          <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.85)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#fff', padding: '2rem' }}>
-            {overlayInfo.amber && (
-              <div style={{ background: '#FFBF00', color: '#000', padding: '0.8rem', borderRadius: '8px', marginBottom: '1rem' }}>
-                {overlayInfo.amber}
-              </div>
-            )}
-            <h2 style={{ marginBottom: '0.5rem' }}>Roll No: {overlayInfo.rollNo}</h2>
-            {overlayInfo.manual && (
-              <button onClick={handleManualSubmit} style={{ marginTop: '1rem', background: '#22c55e', border: 'none', padding: '0.8rem 1.2rem', borderRadius: '6px' }}>
-                Submit Attendance
-              </button>
-            )}
+        {/* Amber floating alert */}
+        {amberAlert && (
+          <div style={{ position: 'absolute', bottom: '5%', left: '50%', transform: 'translateX(-50%)', background: '#FFBF00', color: '#000', padding: '0.6rem 1rem', borderRadius: '8px', boxShadow: '0 4px 6px rgba(255,191,0,0.3)' }}>
+            {amberAlert.msg}
           </div>
         )}
       </div>
