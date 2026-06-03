@@ -36,7 +36,7 @@ export const syncOfflineQueue = async () => {
   
   if (pending.length === 0) return { success: true, count: 0 };
 
-  const API_ENDPOINT = 'https://script.google.com/macros/s/AKfycbzvKaVpmlynSi30iHPcOcGIf1qpYrBquuzMto1L67Wth8hOs1WwAb9CG94e-t67Y8fl/exec';
+  const API_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxgprYuk5ICscp_mm6vNx65RnB2j_uMO2Y6qTp7f0qCl7BQsucUjPxem_40I39XHbRn/exec';
 
   let syncedCount = 0;
   for (const record of pending) {
@@ -48,15 +48,14 @@ export const syncOfflineQueue = async () => {
         headers: {
           'Content-Type': 'text/plain;charset=utf-8' 
         },
-        body: JSON.stringify({
-          studentName: record.student?.name || "Scan Result",
-          rollNumber: record.student?.rollNo || record.qrData || "Unknown",
-          city: record.city || "Unknown",
-          event: 'Summer Camp',
-          activity: record.activity,
-          volunteerId: record.volunteerId || 'V001',
-          status: 'Present' // Put this back just in case the sheet expects exactly 8 columns (including timestamp)
-        })
+          body: JSON.stringify({
+            // Column order required by the sheet
+            TimeStamp: new Date().toISOString(),
+            RollNo_Name: `${record.student?.rollNo || record.qrData || "Unknown"}-${record.student?.name || "Scan Result"}`,
+            Activity_Attendance: `${record.activity || ""}-${record.status || "Present"}`,
+            Volunteer_ID_Name: `${record.volunteerId || localStorage.getItem('volunteer_id') || "V001"}-${record.volunteerName || localStorage.getItem('volunteer_name') || ""}`,
+            Roll_No: record.student?.rollNo || record.qrData || "Unknown"
+          })
       });
       
       // Google Apps Script responses may return redirect, check response ok or opaque type

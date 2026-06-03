@@ -28,40 +28,53 @@ function ScanQR() {
     scanProcessedRef.current = new Set();
   }, []);
 
-  const handleScan = (result) => {
+  const handleScan = async (result) => {
     if (result && result[0]?.rawValue) {
       const rawText = result[0].rawValue;
-      
       if (scanProcessedRef.current.has(rawText)) return;
-      
       scanProcessedRef.current.add(rawText);
-      
-      const studentData = parseQRPayload(rawText);
-      setScannedStudent(studentData);
-      setScannedRaw(rawText);
 
-      saveToOfflineQueue({ student: studentData, qrData: rawText, date, event, city, activity });
-      if (navigator.onLine) {
-        syncOfflineQueue();
+      try {
+        const studentData = parseQRPayload(rawText);
+        setScannedRaw(rawText);
+
+        const response = await fetch(`${process.env.REACT_APP_API_URL}/students/${studentData.rollNo}`);
+        if (response.ok) {
+          const studentInfo = await response.json();
+          setScannedStudent(studentInfo);
+          setStatus('confirming');
+        } else {
+          setScannedStudent({ rollNo: studentData.rollNo, name: 'Unknown Student' });
+          setStatus('confirming');
+        }
+      } catch (err) {
+        setScannedStudent({ rollNo: rawText, name: 'Error fetching' });
+        setStatus('confirming');
       }
-      
-      setStatus('success');
-      
-      setTimeout(() => {
+    }
+  };
+  
+  const handleSubmitConfirmation = async () => {
+    saveToOfflineQueue({ student: scannedStudent, qrData: scannedRaw, date, event, city, activity });
+    if (navigator.onLine) {
+      syncOfflineQueue();
+    }
+    setStatus('success');
+    setTimeout(() => {
         setStatus('scanning');
         setScannedStudent(null);
         setScannedRaw('');
         setTimeout(() => {
-            scanProcessedRef.current.delete(rawText);
+            scanProcessedRef.current.clear();
         }, 2000);
-      }, 1500);
-    }
+    }, 1500);
   };
-  
+
   const handleScanNext = () => {
     setStatus('scanning');
     setScannedStudent(null);
     setScannedRaw('');
+    scanProcessedRef.current.clear();
   };
 
   const handleError = (err) => {
