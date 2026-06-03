@@ -107,7 +107,7 @@ function ScanQR() {
         {statusMsg && <span style={{ marginLeft: 'auto', color: '#22c55e', fontWeight: '600' }}>{statusMsg}</span>}
       </div>
 {amberAlert && (
-        <div style={{ width: '90%', background: '#ba3906', color: '#fff', padding: '12px 16px', borderRadius: '8px', textAlign: 'center', marginBottom: '12px', pointerEvents: 'none' }}>
+        <div style={{ width: '90%', background: '#ba3906', color: '#fff', padding: '12px 16px', borderRadius: '8px', textAlign: 'center', margin: '0 auto 12px', pointerEvents: 'none' }}>
     {amberAlert.msg}
   </div>
 )}
