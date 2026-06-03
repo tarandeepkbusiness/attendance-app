@@ -1,428 +1,170 @@
+// ScanQR.jsx - rebuilt for zero-navigation, auto-scan toggle, and performance
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Scanner } from '@yudiel/react-qr-scanner';
-import { ArrowLeft, Search, RefreshCw, Camera, CheckCircle, Calendar, MapPin, Tag, UserPlus } from 'lucide-react';
+import { ArrowLeft, Search, Camera, CheckCircle } from 'lucide-react';
 import { parseQRPayload } from '../../utils/studentData';
 import { saveToOfflineQueue, syncOfflineQueue } from '../../utils/offline';
 import { SCRIPT_URL } from '../../config';
 
-const ELECTIVE_ACTIVITIES = ['AI', 'Clay Modelling', 'Cooking', 'Dolki', 'Knitting-Crochet', 'Painting', 'Paper Craft', 'Photography', 'Resin Art', 'Tabla', 'Vocal'];
-
 function ScanQR() {
   const navigate = useNavigate();
-  const [status, setStatus] = useState('scanning'); // 'scanning', 'confirming', 'success', 'denied', 'autoscan_overlay'
+
+  // UI state
+  const [autoScan, setAutoScan] = useState(true); // toggle for auto‑scan mode
+  const [overlayInfo, setOverlayInfo] = useState(null); // { rollNo, name?, amber? }
+  const [status, setStatus] = useState('scanning'); // 'scanning' | 'overlay'
   const [error, setError] = useState(null);
-  
-  const [scannedStudent, setScannedStudent] = useState(null);
-  const [scannedRaw, setScannedRaw] = useState('');
-  
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const city = localStorage.getItem('volunteer_city') || "City A";
-  const event = localStorage.getItem('volunteer_event') || "Morning Session";
-  const activity = localStorage.getItem('volunteer_activity') || "";
-  const [nameLoading, setNameLoading] = useState(false);
-  const [mandatoryWarning, setMandatoryWarning] = useState(null);
+  const [date] = useState(new Date().toISOString().split('T')[0]);
+  const city = localStorage.getItem('volunteer_city') || 'City A';
+  const event = localStorage.getItem('volunteer_event') || 'Morning Session';
+  const activity = localStorage.getItem('volunteer_activity') || '';
 
-  
-  const scanProcessedRef = useRef(new Set());
-
+  // Prevent processing the same QR code multiple times rapidly
+  const processedSet = useRef(new Set());
   useEffect(() => {
-    scanProcessedRef.current = new Set();
+    processedSet.current.clear();
   }, []);
 
   const handleScan = async (result) => {
-    if (result && result[0]?.rawValue) {
-      const rawText = result[0].rawValue;
-      if (scanProcessedRef.current.has(rawText)) return;
-      scanProcessedRef.current.add(rawText);
+    if (!result?.[0]?.rawValue) return;
+    const rawText = result[0].rawValue;
+    if (processedSet.current.has(rawText)) return;
+    processedSet.current.add(rawText);
 
+    const payload = parseQRPayload(rawText);
+    const rollNo = payload?.rollNo || rawText;
+    const overlay = { rollNo, amber: null };
+
+    // Amber‑Alert check for non‑compulsory activities
+    const isCompulsory = activity === 'Meditation & Shudh Gurbani' || activity === 'Meditation & Sudh Gurbani';
+    if (!isCompulsory && navigator.onLine) {
       try {
-        const studentData = parseQRPayload(rawText);
-        setScannedRaw(rawText);
-        // Initialize scanned student with payload data or placeholder
-        const initialStudent = studentData || { rollNo: rawText, name: 'Unknown Student' };
-        setScannedStudent(initialStudent);
-        setStatus('confirming');
-        setMandatoryWarning(null);
-        setNameLoading(true);
-
-        // Fetch real name from backend
-        try {
-          const resp = await fetch(`${SCRIPT_URL}?action=rollLookup&rollNo=${encodeURIComponent(initialStudent.rollNo)}`);
-          if (resp.ok) {
-            const data = await resp.json();
-            if (data && data.success && data.name) {
-              setScannedStudent(prev => ({ ...prev, name: data.name, city: data.city || prev.city }));
-            } else if (data && data.message) {
-              console.warn('Roll lookup returned message:', data.message);
-            }
-          }
-        } catch (lookupErr) {
-          console.error('Failed to lookup roll info:', lookupErr);
-        } finally {
-          setNameLoading(false);
-        }
-
-        // Amber Alert: Check if they attended 'Meditation & Shudh Gurbani'
-        const isCompulsory = activity === 'Meditation & Shudh Gurbani' || activity === 'Meditation & Sudh Gurbani';
-        if (!isCompulsory && studentData?.rollNo) {
-          try {
-            const checkResp = await fetch(`${SCRIPT_URL}?action=checkCompulsory&rollNo=${encodeURIComponent(studentData.rollNo)}`);
-            if (checkResp.ok) {
-              const checkData = await checkResp.json();
-              if (checkData && checkData.attended === false) {
-                setMandatoryWarning(`Roll No. ${studentData.rollNo} didn't attend Meditation and Shudh Gurbani today!`);
-              }
-            }
-          } catch (checkErr) {
-            console.error('Failed to run compulsory activity check:', checkErr);
+        const resp = await fetch(`${SCRIPT_URL}?action=checkCompulsory&rollNo=${encodeURIComponent(rollNo)}`);
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data && data.attended === false) {
+            overlay.amber = `Roll No. ${rollNo} didn't attend Meditation and Shudh Gurbani today!`;
           }
         }
-      } catch (err) {
-        console.error('Scan handling error:', err);
-        setStatus('scanning');
+      } catch (e) {
+        console.error('Compulsory check failed', e);
       }
     }
-  };
-  
-  const handleSubmitConfirmation = async () => {
-    saveToOfflineQueue({ student: scannedStudent, qrData: scannedRaw, date, event, city, activity });
-    if (navigator.onLine) {
-      syncOfflineQueue();
+
+    // Save attendance (auto‑scan or manual later)
+    const saveAttendance = async () => {
+      await saveToOfflineQueue({ student: { rollNo }, qrData: rawText, date, event, city, activity });
+      if (navigator.onLine) await syncOfflineQueue();
+    };
+
+    if (autoScan) {
+      await saveAttendance();
+      setOverlayInfo(overlay);
+      setStatus('overlay');
+      setTimeout(() => {
+        setStatus('scanning');
+        setOverlayInfo(null);
+        processedSet.current.clear();
+      }, overlay.amber ? 1500 : 1000);
+    } else {
+      // Manual mode – show overlay with submit button
+      setOverlayInfo({ ...overlay, manual: true });
+      setStatus('overlay');
     }
-    setStatus('success');
-    setMandatoryWarning(null);
   };
 
-  const handleSubmitAutoScan = async () => {
-    saveToOfflineQueue({ student: scannedStudent, qrData: scannedRaw, date, event, city, activity });
-    if (navigator.onLine) {
-      syncOfflineQueue();
-    }
-    setStatus('autoscan_overlay');
-    setTimeout(() => {
-      setStatus('scanning');
-      setScannedStudent(null);
-      setScannedRaw('');
-      setMandatoryWarning(null);
-      scanProcessedRef.current.clear();
-    }, 1000);
-  };
-  
-  const handleScanNext = () => {
+  const handleManualSubmit = async () => {
+    if (!overlayInfo) return;
+    await saveToOfflineQueue({ student: { rollNo: overlayInfo.rollNo }, qrData: overlayInfo.rollNo, date, event, city, activity });
+    if (navigator.onLine) await syncOfflineQueue();
     setStatus('scanning');
-    setScannedStudent(null);
-    setScannedRaw('');
-    setMandatoryWarning(null);
-    scanProcessedRef.current.clear();
+    setOverlayInfo(null);
+    processedSet.current.clear();
   };
 
   const handleError = (err) => {
-    console.error('Scanner device error:', err);
-    setStatus('denied');
+    console.error('Scanner error:', err);
     setError('Camera permission required for QR scan.');
-    localStorage.removeItem('camera_permission_granted');
+    setStatus('scanning');
   };
 
-  const handleRetryPermission = async () => {
-    setStatus('scanning');
-    setError(null);
-    scanProcessedRef.current = false;
-    
+  const retryPermission = async () => {
     try {
-      // Trigger user gesture stream request to re-enable permission
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-      stream.getTracks().forEach(track => track.stop());
+      stream.getTracks().forEach((t) => t.stop());
       localStorage.setItem('camera_permission_granted', 'true');
-      window.location.reload(); // Reload to remount cleaner camera container
-    } catch (err) {
-      console.error('Permission retry failed:', err);
-      setStatus('denied');
+      window.location.reload();
+    } catch (e) {
       setError('Camera permission required for QR scan.');
     }
   };
 
   return (
-    <div className="app-container animate-fade-in" style={{ padding: 0, backgroundColor: 'black', color: 'white', display: 'flex', flexDirection: 'column' }}>
-      {/* Absolute overlay Header */}
-      <div style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 10, position: 'absolute', top: 0, width: '100%', boxSizing: 'border-box' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <img onError={(e) => { e.target.onerror = null; e.target.src='/favicon.svg'; }} src="/logo.png" alt="App Logo" style={{ height: '32px', width: 'auto' }} />
-          <button onClick={() => navigate(-1)} style={{ color: 'white', display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(0,0,0,0.5)', padding: '0.5rem 0.8rem', borderRadius: '20px', fontSize: '0.9rem' }}>
-            <ArrowLeft size={18} />
-            <span>Back</span>
-          </button>
-        </div>
-        <button onClick={() => navigate('/volunteer/search')} style={{ color: 'white', background: 'rgba(0,0,0,0.5)', padding: '0.5rem', borderRadius: '50%', border: 'none', cursor: 'pointer' }}>
-          <Search size={18} />
+    <div className="app-container" style={{ backgroundColor: '#000', color: '#fff', height: '100vh', display: 'flex', flexDirection: 'column' }}>
+      {/* Header with back & search */}
+      <div style={{ padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <button onClick={() => navigate(-1)} style={{ background: 'none', border: 'none', color: '#fff' }}>
+          <ArrowLeft size={20} /> Back
+        </button>
+        <button onClick={() => navigate('/volunteer/search')} style={{ background: 'none', border: 'none', color: '#fff' }}>
+          <Search size={20} />
         </button>
       </div>
 
-      {/* Main scan / state viewport */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative', width: '100%', height: '100%' }}>
-        
-        {status === 'denied' && (
-          <div style={{ textAlign: 'center', padding: '2rem', maxWidth: '320px', zIndex: 10 }}>
-            <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.15)', border: '1px solid var(--error-color)', padding: '1.5rem', borderRadius: 'var(--border-radius-md)', marginBottom: '1.5rem' }}>
-              <p style={{ color: '#ff6b6b', fontWeight: '600', marginBottom: '0.5rem', fontSize: '0.95rem' }}>
-                Camera permission required for QR scan.
-              </p>
-              <p style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.7)', lineHeight: 1.4, margin: 0 }}>
-                Please grant camera permissions to capture student registration identifiers.
-              </p>
-            </div>
-            <button 
-              onClick={handleRetryPermission}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                backgroundColor: 'var(--secondary-color)',
-                color: 'white',
-                padding: '0.8rem 1.5rem',
-                borderRadius: 'var(--border-radius-lg)',
-                fontWeight: '600',
-                border: 'none',
-                cursor: 'pointer',
-                boxShadow: '0 4px 10px rgba(212, 175, 55, 0.3)'
-              }}
-            >
-              <Camera size={18} />
-              Retry Permission
-            </button>
-          </div>
-        )}
+      {/* Auto‑scan toggle */}
+      <div style={{ padding: '0 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <input
+          type="checkbox"
+          id="autoScanToggle"
+          checked={autoScan}
+          onChange={(e) => setAutoScan(e.target.checked)}
+        />
+        <label htmlFor="autoScanToggle" style={{ color: '#fff' }}>Auto‑Scan</label>
+      </div>
 
-        {status === 'confirming' && (
-          <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 20, display: 'flex', flexDirection: 'column', padding: '1.5rem', paddingTop: '80px', boxSizing: 'border-box' }}>
-            <div className="card" style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '2rem 1.5rem', backgroundColor: 'var(--bg-color)', color: 'var(--text-color)', borderRadius: '24px', overflowY: 'auto' }}>
-              <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-                <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: 'rgba(212, 175, 55, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
-                  <CheckCircle size={40} color="var(--secondary-color)" />
-                </div>
-                <h2 style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>
-                  {nameLoading ? (
-                    <span style={{ display: 'inline-flex', alignItems: 'center' }}>
-                      <span className="loader" style={{
-                        width: '0.9rem',
-                        height: '0.9rem',
-                        border: '2px solid var(--secondary-color)',
-                        borderTop: '2px solid transparent',
-                        borderRadius: '50%',
-                        animation: 'spin 0.8s linear infinite',
-                        marginRight: '0.5rem'
-                      }} />
-                      Loading...
-                    </span>
-                  ) : (
-                    scannedStudent?.name || `Student (${scannedStudent?.rollNo || scannedRaw})`
-                  )}
-                </h2>
-
-                <p style={{ fontSize: '1.1rem', color: 'rgba(128, 90, 64, 0.7)', margin: 0 }}>{scannedStudent?.rollNo || scannedRaw || "Unknown ID"}</p>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '2rem', flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem', backgroundColor: 'rgba(128, 90, 64, 0.03)', borderRadius: '12px' }}>
-                  <MapPin size={20} color="var(--secondary-color)" />
-                  <div>
-                    <p style={{ margin: 0, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'rgba(128, 90, 64, 0.6)' }}>City</p>
-                    <p style={{ margin: 0, fontWeight: '500' }}>{city}</p>
-                  </div>
-                </div>
-                
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem', backgroundColor: 'rgba(128, 90, 64, 0.03)', borderRadius: '12px' }}>
-                  <Tag size={20} color="var(--secondary-color)" />
-                  <div>
-                    <p style={{ margin: 0, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'rgba(128, 90, 64, 0.6)' }}>Event</p>
-                    <p style={{ margin: 0, fontWeight: '500' }}>{event}</p>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem', backgroundColor: 'rgba(128, 90, 64, 0.03)', borderRadius: '12px' }}>
-                  <Calendar size={20} color="var(--secondary-color)" />
-                  <div style={{ flex: 1 }}>
-                    <p style={{ margin: 0, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'rgba(128, 90, 64, 0.6)' }}>Date</p>
-                    <input 
-                      type="date" 
-                      value={date} 
-                      onChange={(e) => setDate(e.target.value)}
-                      style={{ 
-                        width: '100%', 
-                        border: 'none', 
-                        backgroundColor: 'transparent', 
-                        padding: 0, 
-                        margin: 0, 
-                        fontWeight: '500', 
-                        color: 'var(--text-color)',
-                        outline: 'none'
-                      }} 
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {mandatoryWarning && (
-                <div style={{ backgroundColor: '#FFBF00', color: '#000', padding: '1rem', borderRadius: '12px', marginBottom: '1.5rem', fontWeight: '600', fontSize: '0.95rem', display: 'flex', alignItems: 'center', boxShadow: '0 4px 6px rgba(255, 191, 0, 0.3)' }}>
-                  {mandatoryWarning}
-                </div>
-              )}
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                <div style={{ display: 'flex', gap: '1rem' }}>
-                  <button className="btn-primary" onClick={handleSubmitConfirmation} style={{ flex: 1, padding: '1rem', fontSize: '0.9rem' }}>
-                    Submit Attendance
-                  </button>
-                  <button className="btn-primary" onClick={handleSubmitAutoScan} style={{ flex: 1, padding: '1rem', fontSize: '0.9rem', backgroundColor: '#22c55e', borderColor: '#22c55e' }}>
-                    Submit & Auto-Scan
-                  </button>
-                </div>
-                <button className="btn-secondary" onClick={handleScanNext} style={{ width: '100%', padding: '1rem' }}>
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {status === 'autoscan_overlay' && (
-          <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(34, 197, 94, 0.95)', zIndex: 30, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', boxSizing: 'border-box' }}>
-            <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.5rem' }}>
-              <CheckCircle size={40} color="#22c55e" />
-            </div>
-            <h2 style={{ color: 'white', marginBottom: '0.5rem', fontSize: '1.75rem', textAlign: 'center', margin: 0 }}>Attendance Recorded!</h2>
-            <p style={{ color: 'white', fontSize: '1.4rem', textAlign: 'center', fontWeight: 'bold', margin: '1rem 0 0.5rem 0' }}>
-              {scannedStudent?.name || "Student"}
-            </p>
-            <p style={{ color: 'rgba(255,255,255,0.9)', fontSize: '1.15rem', textAlign: 'center', margin: 0 }}>
-              Roll No: {scannedStudent?.rollNo || scannedRaw}
-            </p>
-          </div>
-        )}
-
-        {status === 'success' && (
-          <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
-            <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: 'rgba(34, 197, 94, 0.15)', border: '2px solid var(--success-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.5rem', animation: 'scaleIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)' }}>
-              <CheckCircle size={40} color="var(--success-color)" />
-            </div>
-            
-            <h2 style={{ color: 'white', marginBottom: '0.5rem', fontSize: '1.75rem', textAlign: 'center' }}>Attendance Recorded!</h2>
-            <p style={{ color: 'rgba(255,255,255,0.7)', textAlign: 'center', marginBottom: '2.5rem' }}>
-              {scannedStudent?.name || `Student (${scannedStudent?.rollNo || scannedRaw})`} has been checked in.
-            </p>
-            
-            <button 
-              className="btn-primary" 
-              onClick={handleScanNext}
-              style={{ padding: '1.25rem', width: '100%', maxWidth: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', fontSize: '1.1rem' }}
-            >
-              <Camera size={20} />
-              Scan Next Person
-            </button>
-            
-            <button 
-              onClick={() => navigate('/volunteer/search')}
-              style={{ marginTop: '1.5rem', background: 'none', border: 'none', color: 'rgba(255,255,255,0.6)', textDecoration: 'underline', padding: '0.5rem' }}
-            >
-              Or enter manually
-            </button>
-          </div>
-        )}
-
+      {/* Main content */}
+      <div style={{ flex: 1, position: 'relative' }}>
         {status === 'scanning' && (
-          <div style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0 }}>
-            {/* Camera feed from Yudiel QR Scanner */}
-            <Scanner 
-              onScan={handleScan}
-              onError={handleError}
-              paused={status !== 'scanning'}
-              allowMultiple={false}
-              scanDelay={250}
-              constraints={{ 
-                facingMode: 'environment',
-                width: { ideal: 1920 },
-                height: { ideal: 1080 }
-              }}
-              components={{
-                audio: false,
-                finder: false
-              }}
-              styles={{
-                container: { width: '100%', height: '100%' },
-                video: { width: '100%', height: '100%', objectFit: 'cover' }
-              }}
-            />
-            
-            {/* Visual Scan Frame Overlay */}
-            <div style={{
-              position: 'absolute',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              width: '260px',
-              height: '260px',
-              border: '3px solid var(--secondary-color)',
-              borderRadius: '24px',
-              boxShadow: '0 0 0 4000px rgba(0, 0, 0, 0.6)',
-              zIndex: 5,
-              pointerEvents: 'none',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              {/* Corner accents for premium styling */}
-              <div style={{ position: 'absolute', top: -3, left: -3, width: '24px', height: '24px', borderTop: '5px solid white', borderLeft: '5px solid white', borderRadius: '24px 0 0 0' }} />
-              <div style={{ position: 'absolute', top: -3, right: -3, width: '24px', height: '24px', borderTop: '5px solid white', borderRight: '5px solid white', borderRadius: '0 24px 0 0' }} />
-              <div style={{ position: 'absolute', bottom: -3, left: -3, width: '24px', height: '24px', borderBottom: '5px solid white', borderLeft: '5px solid white', borderRadius: '0 0 0 24px' }} />
-              <div style={{ position: 'absolute', bottom: -3, right: -3, width: '24px', height: '24px', borderBottom: '5px solid white', borderRight: '5px solid white', borderRadius: '0 0 24px 0' }} />
-              
-              {/* Pulsing scanning red line */}
-              <div style={{
-                width: '90%',
-                height: '2px',
-                backgroundColor: 'rgba(239, 68, 68, 0.8)',
-                boxShadow: '0 0 8px rgba(239, 68, 68, 0.8)',
-                position: 'absolute',
-                animation: 'scanLine 2s linear infinite'
-              }} />
-            </div>
+          <Scanner
+            onScan={handleScan}
+            onError={handleError}
+            paused={false}
+            allowMultiple={false}
+            scanDelay={250}
+            constraints={{ facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }}
+            components={{ audio: false, finder: false }}
+            styles={{ container: { width: '100%', height: '100%' }, video: { width: '100%', height: '100%', objectFit: 'cover' } }}
+          />
+        )}
 
-            {/* Helper texts */}
-            <div style={{ position: 'absolute', bottom: '15%', width: '100%', textAlign: 'center', zIndex: 10, padding: '0 1.5rem', boxSizing: 'border-box' }}>
-              <p style={{ margin: '0 0 0.5rem 0', fontSize: '1.05rem', fontWeight: '600', textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>
-                Point camera at QR code.
-              </p>
-              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--secondary-color)', fontWeight: '600', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>
-                <span className="scanning-dot" style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--secondary-color)', animation: 'pulse 1s infinite' }}></span>
-                Scanning...
-              </p>
-              {error && <p style={{ color: '#ff6b6b', fontSize: '0.85rem', marginTop: '0.5rem', textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>{error}</p>}
-            </div>
+        {/* Permission error UI */}
+        {error && (
+          <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', padding: '1rem', background: 'rgba(255,0,0,0.2)', color: '#fff' }}>
+            <p>{error}</p>
+            <button onClick={retryPermission} style={{ marginTop: '0.5rem', background: '#fff', color: '#000' }}>
+              <Camera size={16} /> Retry Permission
+            </button>
+          </div>
+        )}
+
+        {/* Overlay after scan */}
+        {status === 'overlay' && overlayInfo && (
+          <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.85)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#fff', padding: '2rem' }}>
+            {overlayInfo.amber && (
+              <div style={{ background: '#FFBF00', color: '#000', padding: '0.8rem', borderRadius: '8px', marginBottom: '1rem' }}>
+                {overlayInfo.amber}
+              </div>
+            )}
+            <h2 style={{ marginBottom: '0.5rem' }}>Roll No: {overlayInfo.rollNo}</h2>
+            {overlayInfo.manual && (
+              <button onClick={handleManualSubmit} style={{ marginTop: '1rem', background: '#22c55e', border: 'none', padding: '0.8rem 1.2rem', borderRadius: '6px' }}>
+                Submit Attendance
+              </button>
+            )}
           </div>
         )}
       </div>
-
-      <style>
-        {`
-          @keyframes scanLine {
-            0% { top: 10%; }
-            50% { top: 90%; }
-            100% { top: 10%; }
-          }
-          @keyframes pulse {
-            0%, 100% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.4); opacity: 0.5; }
-          }
-          @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-          }
-          @keyframes scaleIn {
-            0% { transform: scale(0.8); opacity: 0; }
-            100% { transform: scale(1); opacity: 1; }
-          }
-        `}
-      </style>
     </div>
   );
 }
