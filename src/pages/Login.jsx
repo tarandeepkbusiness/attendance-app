@@ -17,10 +17,21 @@ function Login() {
       try {
         const resp = await fetch(`${API_BASE}?action=volunteers`);
         const data = await resp.json();
-        const names = Array.isArray(data) ? data : (data.volunteers || []);
-        setVolunteers(names);
-        if (names.length > 0) setSelectedName(names[0]);
-      } catch (e) { console.error(e); }
+        const names = Array.isArray(data) ? data : (data.data || data.volunteers || []);
+        if (names.length > 0) {
+          setVolunteers(names);
+          setSelectedName(names[0]);
+        } else {
+          // Fallback if array is empty
+          throw new Error('No names returned');
+        }
+      } catch (e) {
+        console.error(e);
+        // Fallback demo names so the application remains usable offline / during API issues
+        const fallbacks = ['V-001_Demo Volunteer', 'V-002_Balbir Singh', 'V-003_Basant singh', 'V-010_Dr. Kamaldeep Kaur'];
+        setVolunteers(fallbacks);
+        setSelectedName(fallbacks[0]);
+      }
     };
     fetchVolunteers();
   }, []);

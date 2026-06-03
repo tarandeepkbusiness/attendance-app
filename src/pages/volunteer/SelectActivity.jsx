@@ -15,7 +15,12 @@ function SelectActivity() {
         const resp = await fetch(`${API_BASE}?action=activities`);
         if (!resp.ok) throw new Error('Failed to load activities');
         const data = await resp.json();
-        setActivities(Array.isArray(data) ? data : (data.activities || []));
+        const list = Array.isArray(data) ? data : (data.data || data.activities || []);
+        if (list.length > 0) {
+          setActivities(list);
+        } else {
+          throw new Error('Empty activities list');
+        }
       } catch (e) {
         console.error(e);
         setActivities(['Meditation & Sudh Gurbani', 'AI', 'Clay Modelling', 'Cooking', 'Dholki', 'Knitting-Crochet', 'Painting', 'Paper Craft', 'Photography', 'Resin Art', 'Tabla', 'Vocal']);

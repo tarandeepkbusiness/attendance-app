@@ -44,11 +44,12 @@ function ScanQR() {
           setScannedStudent(studentInfo);
           setStatus('confirming');
         } else {
-          setScannedStudent({ rollNo: studentData.rollNo, name: 'Unknown Student' });
+          setScannedStudent(studentData || { rollNo: studentData?.rollNo || rawText, name: 'Unknown Student' });
           setStatus('confirming');
         }
       } catch (err) {
-        setScannedStudent({ rollNo: rawText, name: 'Error fetching' });
+        const studentData = parseQRPayload(rawText);
+        setScannedStudent(studentData || { rollNo: rawText, name: 'Unknown Student' });
         setStatus('confirming');
       }
     }
