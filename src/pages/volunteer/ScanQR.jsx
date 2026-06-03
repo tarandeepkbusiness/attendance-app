@@ -4,12 +4,13 @@ import { Scanner } from '@yudiel/react-qr-scanner';
 import { ArrowLeft, Search, RefreshCw, Camera, CheckCircle, Calendar, MapPin, Tag, UserPlus } from 'lucide-react';
 import { parseQRPayload } from '../../utils/studentData';
 import { saveToOfflineQueue, syncOfflineQueue } from '../../utils/offline';
+import { SCRIPT_URL } from '../../config';
 
 const ELECTIVE_ACTIVITIES = ['AI', 'Clay Modelling', 'Cooking', 'Dolki', 'Knitting-Crochet', 'Painting', 'Paper Craft', 'Photography', 'Resin Art', 'Tabla', 'Vocal'];
 
 function ScanQR() {
   const navigate = useNavigate();
-  const [status, setStatus] = useState('scanning'); // 'scanning', 'confirming', 'success', 'denied'
+  const [status, setStatus] = useState('scanning'); // 'scanning', 'confirming', 'success', 'denied', 'autoscan_overlay'
   const [error, setError] = useState(null);
   
   const [scannedStudent, setScannedStudent] = useState(null);
@@ -20,7 +21,6 @@ function ScanQR() {
   const event = localStorage.getItem('volunteer_event') || "Morning Session";
   const activity = localStorage.getItem('volunteer_activity') || "";
   const [mandatoryWarning, setMandatoryWarning] = useState(null);
-  
   
   const scanProcessedRef = useRef(new Set());
 
@@ -37,20 +37,28 @@ function ScanQR() {
       try {
         const studentData = parseQRPayload(rawText);
         setScannedRaw(rawText);
-
-        const response = await fetch(`${process.env.REACT_APP_API_URL}/students/${studentData.rollNo}`);
-        if (response.ok) {
-          const studentInfo = await response.json();
-          setScannedStudent(studentInfo);
-          setStatus('confirming');
-        } else {
-          setScannedStudent(studentData || { rollNo: studentData?.rollNo || rawText, name: 'Unknown Student' });
-          setStatus('confirming');
-        }
-      } catch (err) {
-        const studentData = parseQRPayload(rawText);
         setScannedStudent(studentData || { rollNo: rawText, name: 'Unknown Student' });
         setStatus('confirming');
+        setMandatoryWarning(null);
+
+        // Amber Alert: Check if they attended 'Meditation & Shudh Gurbani'
+        const isCompulsory = activity === 'Meditation & Shudh Gurbani' || activity === 'Meditation & Sudh Gurbani';
+        if (!isCompulsory && studentData?.rollNo) {
+          try {
+            const checkResp = await fetch(`${SCRIPT_URL}?action=checkCompulsory&rollNo=${encodeURIComponent(studentData.rollNo)}`);
+            if (checkResp.ok) {
+              const checkData = await checkResp.json();
+              if (checkData && checkData.attended === false) {
+                setMandatoryWarning(`Roll No. ${studentData.rollNo} didn't attend Meditation and Shudh Gurbani today!`);
+              }
+            }
+          } catch (checkErr) {
+            console.error('Failed to run compulsory activity check:', checkErr);
+          }
+        }
+      } catch (err) {
+        console.error('Scan handling error:', err);
+        setStatus('scanning');
       }
     }
   };
@@ -61,20 +69,29 @@ function ScanQR() {
       syncOfflineQueue();
     }
     setStatus('success');
-    setTimeout(() => {
-        setStatus('scanning');
-        setScannedStudent(null);
-        setScannedRaw('');
-        setTimeout(() => {
-            scanProcessedRef.current.clear();
-        }, 2000);
-    }, 1500);
+    setMandatoryWarning(null);
   };
 
+  const handleSubmitAutoScan = async () => {
+    saveToOfflineQueue({ student: scannedStudent, qrData: scannedRaw, date, event, city, activity });
+    if (navigator.onLine) {
+      syncOfflineQueue();
+    }
+    setStatus('autoscan_overlay');
+    setTimeout(() => {
+      setStatus('scanning');
+      setScannedStudent(null);
+      setScannedRaw('');
+      setMandatoryWarning(null);
+      scanProcessedRef.current.clear();
+    }, 1000);
+  };
+  
   const handleScanNext = () => {
     setStatus('scanning');
     setScannedStudent(null);
     setScannedRaw('');
+    setMandatoryWarning(null);
     scanProcessedRef.current.clear();
   };
 
@@ -211,15 +228,35 @@ function ScanQR() {
                 </div>
               )}
 
-              <div style={{ display: 'flex', gap: '1rem' }}>
-                <button className="btn-secondary" onClick={handleScanNext} style={{ flex: 1, padding: '1rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                  <button className="btn-primary" onClick={handleSubmitConfirmation} style={{ flex: 1, padding: '1rem', fontSize: '0.9rem' }}>
+                    Submit Attendance
+                  </button>
+                  <button className="btn-primary" onClick={handleSubmitAutoScan} style={{ flex: 1, padding: '1rem', fontSize: '0.9rem', backgroundColor: '#22c55e', borderColor: '#22c55e' }}>
+                    Submit & Auto-Scan
+                  </button>
+                </div>
+                <button className="btn-secondary" onClick={handleScanNext} style={{ width: '100%', padding: '1rem' }}>
                   Cancel
-                </button>
-                <button className="btn-primary" onClick={handleSubmitConfirmation} style={{ flex: 2, padding: '1rem' }}>
-                  Submit
                 </button>
               </div>
             </div>
+          </div>
+        )}
+
+        {status === 'autoscan_overlay' && (
+          <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(34, 197, 94, 0.95)', zIndex: 30, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', boxSizing: 'border-box' }}>
+            <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.5rem' }}>
+              <CheckCircle size={40} color="#22c55e" />
+            </div>
+            <h2 style={{ color: 'white', marginBottom: '0.5rem', fontSize: '1.75rem', textAlign: 'center', margin: 0 }}>Attendance Recorded!</h2>
+            <p style={{ color: 'white', fontSize: '1.4rem', textAlign: 'center', fontWeight: 'bold', margin: '1rem 0 0.5rem 0' }}>
+              {scannedStudent?.name || "Student"}
+            </p>
+            <p style={{ color: 'rgba(255,255,255,0.9)', fontSize: '1.15rem', textAlign: 'center', margin: 0 }}>
+              Roll No: {scannedStudent?.rollNo || scannedRaw}
+            </p>
           </div>
         )}
 

@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Tag, ChevronRight } from 'lucide-react';
-
-const API_BASE = 'https://script.google.com/macros/s/AKfycbxgprYuk5ICscp_mm6vNx65RnB2j_uMO2Y6qTp7f0qCl7BQsucUjPxem_40I39XHbRn/exec';
+import { SCRIPT_URL } from '../../config';
 
 function SelectActivity() {
   const navigate = useNavigate();
@@ -10,23 +9,16 @@ function SelectActivity() {
   const [selectedActivity, setSelectedActivity] = useState(localStorage.getItem('volunteer_activity') || '');
 
   useEffect(() => {
-    const fetchActivities = async () => {
-      try {
-        const resp = await fetch(`${API_BASE}?action=activities`);
-        if (!resp.ok) throw new Error('Failed to load activities');
-        const data = await resp.json();
-        const list = Array.isArray(data) ? data : (data.data || data.activities || []);
-        if (list.length > 0) {
-          setActivities(list);
-        } else {
-          throw new Error('Empty activities list');
-        }
-      } catch (e) {
-        console.error(e);
-        setActivities(['Meditation & Sudh Gurbani', 'AI', 'Clay Modelling', 'Cooking', 'Dholki', 'Knitting-Crochet', 'Painting', 'Paper Craft', 'Photography', 'Resin Art', 'Tabla', 'Vocal']);
-      }
-    };
-    fetchActivities();
+    const cached = localStorage.getItem('cached_activities');
+    if (cached) {
+      setActivities(JSON.parse(cached));
+    } else {
+      setActivities([
+        'Meditation & Shudh Gurbani',
+        'AI', 'Clay Modelling', 'Cooking', 'Dholki', 'Knitting-Crochet',
+        'Painting', 'Paper Craft', 'Photography', 'Resin Art', 'Tabla', 'Vocal'
+      ]);
+    }
   }, []);
 
   const handleSelect = (activity) => {

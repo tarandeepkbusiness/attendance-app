@@ -1,3 +1,5 @@
+import { SCRIPT_URL } from '../config';
+
 // 1. Get the list of scans waiting to be sent from the phone's memory
 export const getOfflineQueue = () => {
   const data = localStorage.getItem('attendance_offline_queue');
@@ -8,13 +10,12 @@ export const getOfflineQueue = () => {
 export const saveToOfflineQueue = (record) => {
   const queue = getOfflineQueue();
 
-  // Prepare the data to match your Sheet requirements
   const newRecord = {
     ...record,
     id: Date.now().toString(),
     status: 'pending',
     timestamp: new Date().toISOString(),
-    // Pulls the logged-in volunteer info and selected activity from session
+    // Pulls the logged-in info from session
     volunteerName: localStorage.getItem('volunteer_name') || "Unknown",
     volunteerId: localStorage.getItem('volunteer_id') || "V",
     activity: localStorage.getItem('volunteer_activity') || "General"
@@ -39,39 +40,47 @@ export const syncOfflineQueue = async () => {
 
   if (pendingItems.length === 0) return;
 
-  // Your specific Google Apps Script Web App URL
-  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxgprYuk5ICscp_mm6vNx65RnB2j_uMO2Y6qTp7f0qCl7BQsucUjPxem_40I39XHbRn/exec";
-
   for (const item of pendingItems) {
     try {
-      // Payload aligned with your 5 columns
+      const rollNo = item.student?.rollNo || item.rollNo || item.qrData || "Unknown";
+      const studentName = item.student?.name || item.studentName || "Unknown";
+
       const payload = {
-        TimeStamp: item.timestamp,
-        RollNo_Name: `${item.rollNo || "Unknown"}-${item.studentName || "Unknown"}`,
+        action: "markAttendance",
+        scannedRollNo: rollNo,
+        activity: item.activity || "General",
+        volunteerName: item.volunteerName || "Unknown",
+        
+        // Include legacy/column-mapped properties just in case:
+        TimeStamp: item.timestamp || new Date().toISOString(),
+        RollNo_Name: `${rollNo}-${studentName}`,
         Activity_Attendance: item.activity || "Present",
-        Volunteer_ID_Name: `${item.volunteerId}-${item.volunteerName}`,
-        Roll_No: item.rollNo || "Unknown"
+        Volunteer_ID_Name: `${item.volunteerId || "V"}-${item.volunteerName || "Unknown"}`,
+        Roll_No: rollNo
       };
 
+      // Uses the SCRIPT_URL from your new config file
       await fetch(SCRIPT_URL, {
         method: 'POST',
-        mode: 'no-cors', // Used for Google Apps Script to avoid CORS blocks
+        mode: 'no-cors',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify(payload)
       });
 
       // Mark as sent in the phone's memory
       updateRecordStatus(item.id, 'sent');
-      console.log(`Success: Sent Roll No ${item.rollNo}`);
+      console.log(`Success: Sent Roll No ${rollNo}`);
 
     } catch (error) {
-      console.error("Sync failed for this item. Check internet connection.", error);
+      console.error("Sync failed for this item.", error);
     }
   }
+
+  // REQUIREMENT #5: Automatically clean up the list once sync is done
+  clearSyncedRecords();
 };
 
 // 5. THE MISSING FUNCTION: Clears records that have already been sent
-// This fixes the [MISSING_EXPORT] error you received.
 export const clearSyncedRecords = () => {
   const queue = getOfflineQueue();
   // Filter out the ones that are 'sent', keep only 'pending' or 'failed'
