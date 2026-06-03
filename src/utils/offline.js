@@ -14,9 +14,10 @@ export const saveToOfflineQueue = (record) => {
     id: Date.now().toString(),
     status: 'pending',
     timestamp: new Date().toISOString(),
-    // Pulls the logged-in volunteer info from your login session
+    // Pulls the logged-in volunteer info and selected activity from session
     volunteerName: localStorage.getItem('volunteer_name') || "Unknown",
-    volunteerId: localStorage.getItem('volunteer_id') || "V"
+    volunteerId: localStorage.getItem('volunteer_id') || "V",
+    activity: localStorage.getItem('volunteer_activity') || "General"
   };
 
   queue.push(newRecord);
@@ -43,23 +44,18 @@ export const syncOfflineQueue = async () => {
 
   for (const item of pendingItems) {
     try {
-      // THE "BETTER VERSION" PAYLOAD 
-      // Aligned with your 5 columns: Time-Stamp, RollNo-Name, Activity-Attendance, Volunteer, Roll No
+      // Payload aligned with your 5 columns
       const payload = {
         TimeStamp: item.timestamp,
-        // Requirement 3 & 4: Uses Roll No and Student Name combined
         RollNo_Name: `${item.rollNo || "Unknown"}-${item.studentName || "Unknown"}`,
-        // Requirement 2: Takes the Activity Short Name from your Workshop dropdown
         Activity_Attendance: item.activity || "Present",
-        // Requirement 1: Records the Volunteer Name who is logged in
         Volunteer_ID_Name: `${item.volunteerId}-${item.volunteerName}`,
-        // Raw Roll Number
         Roll_No: item.rollNo || "Unknown"
       };
 
       await fetch(SCRIPT_URL, {
         method: 'POST',
-        mode: 'no-cors', // Critical for sending data to Google Apps Script
+        mode: 'no-cors', // Used for Google Apps Script to avoid CORS blocks
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify(payload)
       });
@@ -72,4 +68,14 @@ export const syncOfflineQueue = async () => {
       console.error("Sync failed for this item. Check internet connection.", error);
     }
   }
+};
+
+// 5. THE MISSING FUNCTION: Clears records that have already been sent
+// This fixes the [MISSING_EXPORT] error you received.
+export const clearSyncedRecords = () => {
+  const queue = getOfflineQueue();
+  // Filter out the ones that are 'sent', keep only 'pending' or 'failed'
+  const filteredQueue = queue.filter(item => item.status !== 'sent');
+  localStorage.setItem('attendance_offline_queue', JSON.stringify(filteredQueue));
+  return filteredQueue;
 };
